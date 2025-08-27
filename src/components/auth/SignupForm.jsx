@@ -34,12 +34,25 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { signupSchema } from '@/utils/validation';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { authService } from '@/services/authService';
+import { toast } from 'react-toastify';
+
+const indianStates = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
+  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya',
+  'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim',
+  'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand',
+  'West Bengal', 'Delhi', 'Jammu and Kashmir', 'Ladakh'
+];
 
 const SignupForm = () => {
   const navigate = useNavigate();
-  const { register, isLoading, error, clearError } = useAuth();
+  const { register: authRegister, isLoading: contextLoading, error: contextError, clearError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const {
     control,
@@ -65,77 +78,115 @@ const SignupForm = () => {
   });
 
   useEffect(() => {
-    clearError();
+    if (clearError) clearError();
   }, [clearError]);
 
-  // FIXED: Transform form data to match backend DTO exactly
+  // ✅ UPDATED: Direct customer registration (no PG mapping needed)
   const onSubmit = async (data) => {
-    const registrationData = {
-      // Required fields - exactly matching backend DTO
-      fullName: data.fullName,
-      emailAddress: data.email,              // Frontend uses 'email', backend expects 'emailAddress'
-      mobileNumber: data.mobile,             // Frontend uses 'mobile', backend expects 'mobileNumber'
-      password: data.password,
-      confirmPassword: data.confirmPassword,
-      dateOfBirth: data.dateOfBirth,         // Already in YYYY-MM-DD format for LocalDate
-      gender: data.gender,                   // MALE/FEMALE/OTHER - matches enum
-      acceptTerms: data.acceptTerms,         // Must be true for validation
-      
-      // Optional fields - only send if they have values
-      ...(data.city && data.city.trim() && { city: data.city.trim() }),
-      ...(data.state && data.state.trim() && { state: data.state.trim() }),
-      
-      // Default values for backend
-      country: "India",                      // Default country
-      preferredLanguage: "en",               // Default language
-      marketingConsent: data.marketingConsent || false,
-      
-      // Emergency contact - only send if provided
-      ...(data.emergencyContactName && data.emergencyContactName.trim() && { 
-        emergencyContactName: data.emergencyContactName.trim() 
-      }),
-      ...(data.emergencyContactNumber && data.emergencyContactNumber.trim() && { 
-        emergencyContactNumber: data.emergencyContactNumber.trim() 
-      }),
-    };
-
-    // Debug: Log the data being sent
-    console.log('Form data from user:', data);
-    console.log('Transformed registration data for backend:', JSON.stringify(registrationData, null, 2));
-
     try {
-      await register(registrationData);
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Registration failed:', error);
-      // Error is handled by AuthContext
+      setIsLoading(true);
+      setError('');
+      
+      console.log('📝 Customer registration form data:', data);
+
+      // Prepare data for CustomerRegistrationRequest (direct mapping)
+      const registrationData = {
+        fullName: data.fullName?.trim(),
+        emailAddress: data.email?.trim(),
+        mobileNumber: data.mobile?.trim(),
+        password: data.password,
+        confirmPassword: data.confirmPassword,
+        dateOfBirth: data.dateOfBirth,
+        gender: data.gender,
+        acceptTerms: data.acceptTerms,
+        country: 'India',
+        preferredLanguage: 'en',
+        marketingConsent: data.marketingConsent || false,
+        
+        // Optional fields
+        ...(data.city?.trim() && { city: data.city.trim() }),
+        ...(data.state && { state: data.state }),
+        ...(data.emergencyContactName?.trim() && {
+          emergencyContactName: data.emergencyContactName.trim(),
+        }),
+        ...(data.emergencyContactNumber?.trim() && {
+          emergencyContactNumber: data.emergencyContactNumber.trim(),
+        }),
+      };
+
+      console.log('🚀 Customer registration payload:', registrationData);
+
+      // For customer registration, we need a different method or endpoint
+      // Option 1: Use context-based registration if available
+      if (authRegister) {
+        await authRegister(registrationData);
+        navigate('/dashboard');
+      } else {
+        // Option 2: Use direct API call for customer registration
+        // Note: You'll need a /customer-auth/register endpoint or modify the existing one
+        const response = await authService.register(registrationData);
+        console.log('✅ Customer registration successful:', response);
+        toast.success('Registration successful! Please verify your email.');
+        navigate('/verify-email');
+      }
+      
+    } catch (err) {
+      console.error('❌ Customer registration failed:', err);
+      console.error('Error response:', err.response?.data);
+      
+      // Enhanced error handling
+      if (err.response?.status === 400) {
+        const responseData = err.response.data;
+        
+        if (responseData?.data && typeof responseData.data === 'object') {
+          const errorMessages = Object.values(responseData.data);
+          setError(`Validation errors: ${errorMessages.join(', ')}`);
+        } else if (responseData?.message) {
+          setError(responseData.message);
+        } else {
+          setError('Please check your form data and try again.');
+        }
+      } else if (err.response?.status === 409) {
+        const errorMessage = err.response.data?.message || '';
+        if (errorMessage.toLowerCase().includes('email')) {
+          setError('Email address already exists');
+        } else if (errorMessage.toLowerCase().includes('mobile') || errorMessage.toLowerCase().includes('phone')) {
+          setError('Mobile number already exists');
+        } else {
+          setError('Email or mobile number already exists');
+        }
+      } else if (err.response?.status === 500) {
+        setError('Server error. Please try again later.');
+      } else if (err.code === 'NETWORK_ERROR' || !err.response) {
+        setError('Network error. Please check your connection and try again.');
+      } else {
+        setError(err.response?.data?.message || err.message || 'Registration failed. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const indianStates = [
-    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
-    'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
-    'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya',
-    'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim',
-    'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand',
-    'West Bengal', 'Delhi', 'Jammu and Kashmir', 'Ladakh'
-  ];
+  const displayError = error || contextError;
+  const displayLoading = isLoading || contextLoading;
 
   return (
-    <Box component="form" onSubmit={handleSubmit(onSubmit)}>
-      {error && (
+    <Box
+      component="form"
+      onSubmit={handleSubmit(onSubmit)}
+      noValidate
+    >
+      {displayError && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
+          {displayError}
         </Alert>
       )}
 
-      {/* Required Information */}
       <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: 'primary.main' }}>
         Required Information
       </Typography>
 
       <Grid container spacing={2}>
-        {/* Full Name */}
         <Grid item xs={12}>
           <Controller
             name="fullName"
@@ -159,7 +210,6 @@ const SignupForm = () => {
           />
         </Grid>
 
-        {/* Email */}
         <Grid item xs={12} sm={6}>
           <Controller
             name="email"
@@ -184,7 +234,6 @@ const SignupForm = () => {
           />
         </Grid>
 
-        {/* Mobile */}
         <Grid item xs={12} sm={6}>
           <Controller
             name="mobile"
@@ -194,7 +243,7 @@ const SignupForm = () => {
                 {...field}
                 fullWidth
                 label="Mobile Number *"
-                placeholder="e.g., 9876543210 or +919876543210"
+                placeholder="e.g., 9876543210"
                 error={!!errors.mobile}
                 helperText={errors.mobile?.message}
                 InputProps={{
@@ -209,7 +258,6 @@ const SignupForm = () => {
           />
         </Grid>
 
-        {/* Date of Birth */}
         <Grid item xs={12} sm={6}>
           <Controller
             name="dateOfBirth"
@@ -221,7 +269,7 @@ const SignupForm = () => {
                 label="Date of Birth *"
                 type="date"
                 error={!!errors.dateOfBirth}
-                helperText={errors.dateOfBirth?.message || "You must be at least 18 years old"}
+                helperText={errors.dateOfBirth?.message}
                 InputLabelProps={{ shrink: true }}
                 InputProps={{
                   startAdornment: (
@@ -230,16 +278,18 @@ const SignupForm = () => {
                     </InputAdornment>
                   ),
                 }}
-                // Set max date to 18 years ago
                 inputProps={{
-                  max: new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]
+                  max: new Date(
+                    new Date().setFullYear(new Date().getFullYear() - 18)
+                  )
+                    .toISOString()
+                    .split('T')[0],
                 }}
               />
             )}
           />
         </Grid>
 
-        {/* Gender */}
         <Grid item xs={12} sm={6}>
           <Controller
             name="gender"
@@ -261,7 +311,6 @@ const SignupForm = () => {
           />
         </Grid>
 
-        {/* Password */}
         <Grid item xs={12} sm={6}>
           <Controller
             name="password"
@@ -282,7 +331,10 @@ const SignupForm = () => {
                   ),
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                      <IconButton
+                        onClick={() => setShowPassword(!showPassword)}
+                        edge="end"
+                      >
                         {showPassword ? <VisibilityOff /> : <Visibility />}
                       </IconButton>
                     </InputAdornment>
@@ -293,7 +345,6 @@ const SignupForm = () => {
           />
         </Grid>
 
-        {/* Confirm Password */}
         <Grid item xs={12} sm={6}>
           <Controller
             name="confirmPassword"
@@ -314,8 +365,17 @@ const SignupForm = () => {
                   ),
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end">
-                        {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                      <IconButton
+                        onClick={() =>
+                          setShowConfirmPassword(!showConfirmPassword)
+                        }
+                        edge="end"
+                      >
+                        {showConfirmPassword ? (
+                          <VisibilityOff />
+                        ) : (
+                          <Visibility />
+                        )}
                       </IconButton>
                     </InputAdornment>
                   ),
@@ -328,13 +388,11 @@ const SignupForm = () => {
 
       <Divider sx={{ my: 3 }} />
 
-      {/* Optional Information */}
       <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
         Additional Information (Optional)
       </Typography>
 
       <Grid container spacing={2}>
-        {/* City */}
         <Grid item xs={12} sm={6}>
           <Controller
             name="city"
@@ -358,7 +416,6 @@ const SignupForm = () => {
           />
         </Grid>
 
-        {/* State */}
         <Grid item xs={12} sm={6}>
           <Controller
             name="state"
@@ -380,17 +437,16 @@ const SignupForm = () => {
                 }}
               >
                 <MenuItem value="">Select State</MenuItem>
-                {indianStates.map((state) => (
-                  <MenuItem key={state} value={state}>
-                    {state}
+                {indianStates.map((st) => (
+                  <MenuItem key={st} value={st}>
+                    {st}
                   </MenuItem>
                 ))}
               </TextField>
-            )}
+            )} 
           />
         </Grid>
 
-        {/* Emergency Contact Name */}
         <Grid item xs={12} sm={6}>
           <Controller
             name="emergencyContactName"
@@ -414,7 +470,6 @@ const SignupForm = () => {
           />
         </Grid>
 
-        {/* Emergency Contact Number */}
         <Grid item xs={12} sm={6}>
           <Controller
             name="emergencyContactNumber"
@@ -424,7 +479,7 @@ const SignupForm = () => {
                 {...field}
                 fullWidth
                 label="Emergency Contact Number"
-                placeholder="e.g., 9876543210 or +919876543210"
+                placeholder="e.g., 9876543210"
                 error={!!errors.emergencyContactNumber}
                 helperText={errors.emergencyContactNumber?.message}
                 InputProps={{
@@ -440,7 +495,6 @@ const SignupForm = () => {
         </Grid>
       </Grid>
 
-      {/* Checkboxes */}
       <Box sx={{ mt: 3 }}>
         <Controller
           name="marketingConsent"
@@ -482,16 +536,15 @@ const SignupForm = () => {
         )}
       </Box>
 
-      {/* Sign Up Button */}
       <Button
         type="submit"
         fullWidth
         variant="contained"
         size="large"
-        disabled={isLoading}
+        disabled={displayLoading}
         sx={{ mt: 3, mb: 2, py: 1.5 }}
       >
-        {isLoading ? <CircularProgress size={24} /> : 'Create Account'}
+        {displayLoading ? <CircularProgress size={24} /> : 'Create Account'}
       </Button>
 
       <Divider sx={{ mb: 2 }}>
@@ -500,7 +553,6 @@ const SignupForm = () => {
         </Box>
       </Divider>
 
-      {/* Social Signup Buttons */}
       <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
         <Button
           fullWidth
@@ -520,14 +572,12 @@ const SignupForm = () => {
         </Button>
       </Box>
 
-      {/* Sign In Link */}
       <Box textAlign="center">
-        <Box component="span" sx={{ color: 'text.secondary' }}>
+        <Typography variant="body2" color="text.secondary">
           Already have an account?{' '}
-        </Box>
+        </Typography>
         <Link
           component="button"
-          type="button"
           variant="body1"
           onClick={() => navigate('/login')}
           sx={{ fontWeight: 600 }}

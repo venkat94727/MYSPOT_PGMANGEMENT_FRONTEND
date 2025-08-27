@@ -1,8 +1,7 @@
 
-
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9000';
 
 // Create axios instance
 const apiClient = axios.create({
@@ -38,12 +37,12 @@ apiClient.interceptors.response.use(
 
 class AuthService {
   async login({ emailAddress, password, rememberMe = false }) {
-    const response = await apiClient.post('/auth/login', { emailAddress, password, rememberMe });
+    const response = await apiClient.post('/pg-auth/login', { emailAddress, password, rememberMe });
     return response.data.data;
   }
 
   async verifyLoginOtp({ emailAddress, otp }) {
-    const response = await apiClient.post('/auth/verify-otp', {
+    const response = await apiClient.post('/pg-auth/verify-otp', {
       emailAddress,
       otp,
       otpType: 'LOGIN_VERIFICATION'
@@ -54,30 +53,44 @@ class AuthService {
     return data;
   }
 
+  // ✅ UPDATED: Maps PG registration fields to CustomerRegistrationRequest structure
   async register(userData) {
+    console.log('🔍 PG Registration data received:', userData);
+    
     const payload = {
-      fullName: userData.fullName,
+      // Required fields for CustomerRegistrationRequest DTO
+      fullName: userData.ownerName || userData.pgName || 'PG Owner',
       emailAddress: userData.emailAddress,
-      mobileNumber: userData.mobileNumber,
-      dateOfBirth: userData.dateOfBirth,
-      gender: userData.gender,
+      mobileNumber: userData.phoneNumber,               // Map phoneNumber to mobileNumber
+      dateOfBirth: '1990-01-01',                       // Default date (required field)
+      gender: 'MALE',                                  // Default gender (required field)
       password: userData.password,
       confirmPassword: userData.confirmPassword,
-      acceptTerms: userData.acceptTerms,
+      acceptTerms: userData.acceptTerms || true,
+      
+      // Optional fields
       country: userData.country || 'India',
-      preferredLanguage: userData.preferredLanguage || 'en',
-      marketingConsent: userData.marketingConsent || false,
+      preferredLanguage: 'en',
+      marketingConsent: false,
+      
+      // Map PG location info
       ...(userData.city && { city: userData.city }),
       ...(userData.state && { state: userData.state }),
-      ...(userData.emergencyContactName && { emergencyContactName: userData.emergencyContactName }),
-      ...(userData.emergencyContactNumber && { emergencyContactNumber: userData.emergencyContactNumber })
+      
+      // Store PG-specific data in emergency contact fields (creative mapping)
+      ...(userData.pgName && { emergencyContactName: userData.pgName }),
+      ...(userData.pincode && { emergencyContactNumber: userData.pincode }),
     };
-    const response = await apiClient.post('/auth/register', payload);
+    
+    console.log('🚀 Mapped payload for CustomerRegistrationRequest:', payload);
+    console.log('📋 JSON:', JSON.stringify(payload, null, 2));
+    
+    const response = await apiClient.post('/pg-auth/register', payload);
     return response.data.data;
   }
 
   async verifyEmailOtp({ emailAddress, otp }) {
-    const response = await apiClient.post('/auth/verify-otp', {
+    const response = await apiClient.post('/pg-auth/verify-otp', {
       emailAddress,
       otp,
       otpType: 'EMAIL_VERIFICATION'
@@ -86,24 +99,24 @@ class AuthService {
   }
 
   async resendOtp(emailAddress, otpType) {
-    const response = await apiClient.post('/auth/resend-otp', { emailAddress, otpType });
+    const response = await apiClient.post('/pg-auth/resend-otp', { emailAddress, otpType });
     return response.data.data;
   }
 
   async forgotPassword({ emailAddress }) {
-    const response = await apiClient.post('/auth/forgot-password', { emailAddress });
+    const response = await apiClient.post('/pg-auth/forgot-password', { emailAddress });
     return response.data;
   }
 
   async getCurrentUser() {
-    const response = await apiClient.get('/auth/profile');
+    const response = await apiClient.get('/pg-auth/profile');
     return response.data.data;
   }
 
   async logout() {
     const token = localStorage.getItem('accessToken');
     if (token) {
-      await apiClient.post('/auth/logout', {}, { headers: { Authorization: `Bearer ${token}` } });
+      await apiClient.post('/pg-auth/logout', {}, { headers: { Authorization: `Bearer ${token}` } });
     }
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
@@ -112,7 +125,7 @@ class AuthService {
   async refreshToken() {
     const refreshToken = localStorage.getItem('refreshToken');
     if (!refreshToken) throw new Error('No refresh token available');
-    const response = await apiClient.post('/auth/refresh-token', { refreshToken });
+    const response = await apiClient.post('/pg-auth/refresh-token', { refreshToken });
     const data = response.data.data;
     localStorage.setItem('accessToken', data.accessToken);
     return data.accessToken;

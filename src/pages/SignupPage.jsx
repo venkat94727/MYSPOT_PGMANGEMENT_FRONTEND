@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Box, Container, Paper, Typography, TextField, Button, Grid, MenuItem,
@@ -5,7 +6,7 @@ import {
   IconButton, InputAdornment, Stepper, Step, StepLabel
 } from '@mui/material';
 import {
-  Visibility, VisibilityOff, Person, Email, Phone, Lock, Cake
+  Visibility, VisibilityOff, Person, Email, Phone, Lock, Business, LocationOn
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -30,13 +31,19 @@ const SignupPage = () => {
   const registrationForm = useForm({
     resolver: yupResolver(signupSchema),
     defaultValues: {
-      fullName: '',
-      email: '',
-      mobile: '',
+      pgName: '',
+      ownerName: '',
+      pgProfilePicture: '',
+      emailAddress: '',
+      phoneNumber: '',
       password: '',
       confirmPassword: '',
-      dateOfBirth: '',
-      gender: 'MALE',
+      city: '',
+      state: '',
+      country: 'India',
+      pincode: '',
+      latitude: '',
+      longitude: '',
       acceptTerms: false,
     },
   });
@@ -53,50 +60,80 @@ const SignupPage = () => {
     }
   }, [countdown]);
 
+  // ✅ UPDATED: Enhanced registration handler with field mapping
   const handleRegistration = async (data) => {
+    console.log('🎉 HANDLE REGISTRATION CALLED!');
+  console.log('📝 Form data received:', data);
     try {
       setIsLoading(true);
       setError('');
 
+      console.log('📝 Form data collected:', data);
+
+      // Clean and prepare the data for mapping
       const registrationData = {
-        fullName: data.fullName,
-        emailAddress: data.email,
-        mobileNumber: data.mobile,
+        pgName: data.pgName?.trim(),
+        ownerName: data.ownerName?.trim(),
+        pgProfilePicture: data.pgProfilePicture?.trim() || '',
+        emailAddress: data.emailAddress?.trim(),
+        phoneNumber: data.phoneNumber?.trim(),
         password: data.password,
         confirmPassword: data.confirmPassword,
-        dateOfBirth: data.dateOfBirth,
-        gender: data.gender,
+        city: data.city?.trim(),
+        state: data.state?.trim(),
+        country: data.country?.trim() || 'India',
+        pincode: data.pincode?.trim(),
+        latitude: parseFloat(data.latitude) || 0,
+        longitude: parseFloat(data.longitude) || 0,
         acceptTerms: data.acceptTerms,
-        country: 'India',
-        preferredLanguage: 'en',
-        marketingConsent: false,
       };
 
-      await authService.register(registrationData);
+      console.log('🚀 Cleaned registration data:', registrationData);
+      console.log('📋 Will be mapped to CustomerRegistrationRequest structure');
 
-      setUserEmail(data.email);
+      // This will use the updated authService.register method that maps fields
+      const response = await authService.register(registrationData);
+      console.log('✅ Registration successful:', response);
+
+      setUserEmail(data.emailAddress);
       setActiveStep(1);
       setCountdown(60);
       toast.success('Registration successful! Please check your email for OTP.');
+      
     } catch (err) {
-      if(err.response?.status === 409) {
-        const errors = err.response.data?.errors || {};
-        const messages = [];
-        if(errors.emailAddress || (err.response.data?.message && err.response.data.message.toLowerCase().includes('email'))) {
-          messages.push('Email');
-        }
-        if(errors.mobileNumber || (err.response.data?.message && err.response.data.message.toLowerCase().includes('mobile'))) {
-          messages.push('Phone number');
-        }
-        if(messages.length === 2) {
-          setError('Email and Phone number already existed');
-        } else if(messages.length === 1) {
-          setError(`${messages[0]} already exists`);
+      console.error('❌ Registration failed:', err);
+      console.error('Error response:', err.response?.data);
+      console.error('Error status:', err.response?.status);
+      
+      // Enhanced error handling
+      if (err.response?.status === 400) {
+        const responseData = err.response.data;
+        
+        if (responseData?.data && typeof responseData.data === 'object') {
+          // Handle field-specific validation errors
+          const errorMessages = Object.values(responseData.data);
+          setError(`Validation errors: ${errorMessages.join(', ')}`);
+        } else if (responseData?.message) {
+          setError(responseData.message);
         } else {
-          setError(err.response.data?.message || 'Email and Phone number already existed');
+          setError('Please check your form data and try again.');
         }
+      } else if (err.response?.status === 409) {
+        // Handle duplicate data errors
+        const errorMessage = err.response.data?.message || '';
+        if (errorMessage.toLowerCase().includes('email')) {
+          setError('Email address already exists');
+        } else if (errorMessage.toLowerCase().includes('mobile') || errorMessage.toLowerCase().includes('phone')) {
+          setError('Phone number already exists');
+        } else {
+          setError('Email or phone number already exists');
+        }
+      } else if (err.response?.status === 500) {
+        setError('Server error. Please try again later.');
+      } else if (err.code === 'NETWORK_ERROR' || !err.response) {
+        setError('Network error. Please check your connection and try again.');
       } else {
-        setError(err.message);
+        setError(err.response?.data?.message || err.message || 'Registration failed. Please try again.');
       }
     } finally {
       setIsLoading(false);
@@ -146,80 +183,300 @@ const SignupPage = () => {
       <Grid container spacing={2}>
         <Grid item xs={12}>
           <Controller
-            name="fullName"
+            name="pgName"
             control={registrationForm.control}
             render={({ field }) => (
-              <TextField {...field} fullWidth label="Full Name *" error={!!registrationForm.formState.errors.fullName} helperText={registrationForm.formState.errors.fullName?.message}
-                InputProps={{ startAdornment: (<InputAdornment position="start"><Person color="primary" /></InputAdornment>) }} />
+              <TextField 
+                {...field} 
+                fullWidth 
+                label="PG Name *" 
+                error={!!registrationForm.formState.errors.pgName} 
+                helperText={registrationForm.formState.errors.pgName?.message}
+                InputProps={{ 
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Business color="primary" />
+                    </InputAdornment>
+                  ) 
+                }} 
+              />
             )}
           />
         </Grid>
+        
+        <Grid item xs={12}>
+          <Controller
+            name="ownerName"
+            control={registrationForm.control}
+            render={({ field }) => (
+              <TextField 
+                {...field} 
+                fullWidth 
+                label="Owner Name *" 
+                error={!!registrationForm.formState.errors.ownerName} 
+                helperText={registrationForm.formState.errors.ownerName?.message}
+                InputProps={{ 
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Person color="primary" />
+                    </InputAdornment>
+                  ) 
+                }} 
+              />
+            )}
+          />
+        </Grid>
+        
+        <Grid item xs={12}>
+          <Controller
+            name="pgProfilePicture"
+            control={registrationForm.control}
+            render={({ field }) => (
+              <TextField 
+                {...field} 
+                fullWidth 
+                label="PG Profile Picture URL" 
+                error={!!registrationForm.formState.errors.pgProfilePicture} 
+                helperText={registrationForm.formState.errors.pgProfilePicture?.message}
+                placeholder="https://example.com/image.jpg" 
+              />
+            )}
+          />
+        </Grid>
+        
         <Grid item xs={12} sm={6}>
           <Controller
-            name="email"
+            name="emailAddress"
             control={registrationForm.control}
             render={({ field }) => (
-              <TextField {...field} fullWidth label="Email Address *" type="email" error={!!registrationForm.formState.errors.email} helperText={registrationForm.formState.errors.email?.message}
-                InputProps={{ startAdornment: (<InputAdornment position="start"><Email color="primary" /></InputAdornment>) }} />
+              <TextField 
+                {...field} 
+                fullWidth 
+                label="Email Address *" 
+                type="email" 
+                error={!!registrationForm.formState.errors.emailAddress} 
+                helperText={registrationForm.formState.errors.emailAddress?.message}
+                InputProps={{ 
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Email color="primary" />
+                    </InputAdornment>
+                  ) 
+                }} 
+              />
             )}
           />
         </Grid>
+        
         <Grid item xs={12} sm={6}>
           <Controller
-            name="mobile"
+            name="phoneNumber"
             control={registrationForm.control}
             render={({ field }) => (
-              <TextField {...field} fullWidth label="Mobile Number *" error={!!registrationForm.formState.errors.mobile} helperText={registrationForm.formState.errors.mobile?.message}
-                InputProps={{ startAdornment: (<InputAdornment position="start"><Phone color="primary" /></InputAdornment>) }} />
+              <TextField 
+                {...field} 
+                fullWidth 
+                label="Phone Number *" 
+                error={!!registrationForm.formState.errors.phoneNumber} 
+                helperText={registrationForm.formState.errors.phoneNumber?.message}
+                InputProps={{ 
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Phone color="primary" />
+                    </InputAdornment>
+                  ) 
+                }} 
+              />
             )}
           />
         </Grid>
-        <Grid item xs={12} sm={6}>
-          <Controller
-            name="dateOfBirth"
-            control={registrationForm.control}
-            render={({ field }) => (
-              <TextField {...field} fullWidth label="Date of Birth *" type="date" error={!!registrationForm.formState.errors.dateOfBirth} helperText={registrationForm.formState.errors.dateOfBirth?.message}
-                InputLabelProps={{ shrink: true }} InputProps={{ startAdornment: (<InputAdornment position="start"><Cake color="primary" /></InputAdornment>) }} />
-            )}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <Controller
-            name="gender"
-            control={registrationForm.control}
-            render={({ field }) => (
-              <TextField {...field} fullWidth select label="Gender *" error={!!registrationForm.formState.errors.gender} helperText={registrationForm.formState.errors.gender?.message}>
-                <MenuItem value="MALE">Male</MenuItem>
-                <MenuItem value="FEMALE">Female</MenuItem>
-                <MenuItem value="OTHER">Other</MenuItem>
-              </TextField>
-            )}
-          />
-        </Grid>
+        
         <Grid item xs={12} sm={6}>
           <Controller
             name="password"
             control={registrationForm.control}
             render={({ field }) => (
-              <TextField {...field} fullWidth label="Password *" type={showPassword ? 'text' : 'password'} error={!!registrationForm.formState.errors.password} helperText={registrationForm.formState.errors.password?.message}
+              <TextField 
+                {...field} 
+                fullWidth 
+                label="Password *" 
+                type={showPassword ? 'text' : 'password'} 
+                error={!!registrationForm.formState.errors.password} 
+                helperText={registrationForm.formState.errors.password?.message}
                 InputProps={{
-                  startAdornment: (<InputAdornment position="start"><Lock color="primary" /></InputAdornment>),
-                  endAdornment: (<InputAdornment position="end"><IconButton onClick={() => setShowPassword(!showPassword)} edge="end">{showPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment>)
-                }} />
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Lock color="primary" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }} 
+              />
             )}
           />
         </Grid>
+        
         <Grid item xs={12} sm={6}>
           <Controller
             name="confirmPassword"
             control={registrationForm.control}
             render={({ field }) => (
-              <TextField {...field} fullWidth label="Confirm Password *" type={showConfirmPassword ? 'text' : 'password'} error={!!registrationForm.formState.errors.confirmPassword} helperText={registrationForm.formState.errors.confirmPassword?.message}
+              <TextField 
+                {...field} 
+                fullWidth 
+                label="Confirm Password *" 
+                type={showConfirmPassword ? 'text' : 'password'} 
+                error={!!registrationForm.formState.errors.confirmPassword} 
+                helperText={registrationForm.formState.errors.confirmPassword?.message}
                 InputProps={{
-                  startAdornment: (<InputAdornment position="start"><Lock color="primary" /></InputAdornment>),
-                  endAdornment: (<InputAdornment position="end"><IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end">{showConfirmPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment>)
-                }} />
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Lock color="primary" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end">
+                        {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }} 
+              />
+            )}
+          />
+        </Grid>
+        
+        <Grid item xs={12} sm={6}>
+          <Controller
+            name="city"
+            control={registrationForm.control}
+            render={({ field }) => (
+              <TextField 
+                {...field} 
+                fullWidth 
+                label="City *" 
+                error={!!registrationForm.formState.errors.city} 
+                helperText={registrationForm.formState.errors.city?.message}
+                InputProps={{ 
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LocationOn color="primary" />
+                    </InputAdornment>
+                  ) 
+                }} 
+              />
+            )}
+          />
+        </Grid>
+        
+        <Grid item xs={12} sm={6}>
+          <Controller
+            name="state"
+            control={registrationForm.control}
+            render={({ field }) => (
+              <TextField 
+                {...field} 
+                fullWidth 
+                label="State *" 
+                error={!!registrationForm.formState.errors.state} 
+                helperText={registrationForm.formState.errors.state?.message}
+                InputProps={{ 
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LocationOn color="primary" />
+                    </InputAdornment>
+                  ) 
+                }} 
+              />
+            )}
+          />
+        </Grid>
+        
+        <Grid item xs={12} sm={6}>
+          <Controller
+            name="country"
+            control={registrationForm.control}
+            render={({ field }) => (
+              <TextField 
+                {...field} 
+                fullWidth 
+                label="Country *" 
+                error={!!registrationForm.formState.errors.country} 
+                helperText={registrationForm.formState.errors.country?.message}
+                InputProps={{ 
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LocationOn color="primary" />
+                    </InputAdornment>
+                  ) 
+                }} 
+              />
+            )}
+          />
+        </Grid>
+        
+        <Grid item xs={12} sm={6}>
+          <Controller
+            name="pincode"
+            control={registrationForm.control}
+            render={({ field }) => (
+              <TextField 
+                {...field} 
+                fullWidth 
+                label="Pincode *" 
+                error={!!registrationForm.formState.errors.pincode} 
+                helperText={registrationForm.formState.errors.pincode?.message}
+                InputProps={{ 
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LocationOn color="primary" />
+                    </InputAdornment>
+                  ) 
+                }} 
+              />
+            )}
+          />
+        </Grid>
+        
+        <Grid item xs={12} sm={6}>
+          <Controller
+            name="latitude"
+            control={registrationForm.control}
+            render={({ field }) => (
+              <TextField 
+                {...field} 
+                fullWidth 
+                label="Latitude" 
+                type="number" 
+                error={!!registrationForm.formState.errors.latitude} 
+                helperText={registrationForm.formState.errors.latitude?.message}
+                inputProps={{ step: "any", min: -90, max: 90 }} 
+              />
+            )}
+          />
+        </Grid>
+        
+        <Grid item xs={12} sm={6}>
+          <Controller
+            name="longitude"
+            control={registrationForm.control}
+            render={({ field }) => (
+              <TextField 
+                {...field} 
+                fullWidth 
+                label="Longitude" 
+                type="number" 
+                error={!!registrationForm.formState.errors.longitude} 
+                helperText={registrationForm.formState.errors.longitude?.message}
+                inputProps={{ step: "any", min: -180, max: 180 }} 
+              />
             )}
           />
         </Grid>
@@ -230,7 +487,10 @@ const SignupPage = () => {
           name="acceptTerms"
           control={registrationForm.control}
           render={({ field }) => (
-            <FormControlLabel control={<Checkbox {...field} checked={field.value} />} label="I agree to the Terms of Service and Privacy Policy *" />
+            <FormControlLabel 
+              control={<Checkbox {...field} checked={field.value} />} 
+              label="I agree to the Terms of Service and Privacy Policy *" 
+            />
           )}
         />
         {registrationForm.formState.errors.acceptTerms && (
@@ -240,7 +500,14 @@ const SignupPage = () => {
         )}
       </Box>
 
-      <Button type="submit" fullWidth variant="contained" size="large" disabled={isLoading} sx={{ mt: 3 }}>
+      <Button 
+        type="submit" 
+        fullWidth 
+        variant="contained" 
+        size="large" 
+        disabled={isLoading} 
+        sx={{ mt: 3 }}
+      >
         {isLoading ? <CircularProgress size={24} /> : 'Create Account'}
       </Button>
     </Box>
@@ -272,22 +539,40 @@ const SignupPage = () => {
             label="Enter 6-digit OTP"
             error={!!otpForm.formState.errors.otp}
             helperText={otpForm.formState.errors.otp?.message}
-            inputProps={{ maxLength: 6, style: { textAlign: 'center', fontSize: '1.5rem', letterSpacing: '0.5rem' } }}
+            inputProps={{ 
+              maxLength: 6, 
+              style: { 
+                textAlign: 'center', 
+                fontSize: '1.5rem', 
+                letterSpacing: '0.5rem' 
+              } 
+            }}
             sx={{ mb: 3 }}
             autoFocus
           />
         )}
       />
 
-      <Button type="submit" fullWidth variant="contained" size="large" disabled={isLoading} sx={{ mb: 2 }}>
+      <Button 
+        type="submit" 
+        fullWidth 
+        variant="contained" 
+        size="large" 
+        disabled={isLoading} 
+        sx={{ mb: 2 }}
+      >
         {isLoading ? <CircularProgress size={24} /> : 'Verify Email'}
       </Button>
 
       <Box textAlign="center">
         {countdown > 0 ? (
-          <Typography variant="body2" color="text.secondary">Resend OTP in {countdown}s</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Resend OTP in {countdown}s
+          </Typography>
         ) : (
-          <Button variant="text" onClick={handleResendOtp}>Resend OTP</Button>
+          <Button variant="text" onClick={handleResendOtp}>
+            Resend OTP
+          </Button>
         )}
       </Box>
     </Box>
@@ -306,21 +591,44 @@ const SignupPage = () => {
   );
 
   return (
-    <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', py: 4 }}>
+    <Box sx={{ 
+      minHeight: '100vh', 
+      display: 'flex', 
+      alignItems: 'center', 
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+      py: 4 
+    }}>
       <Container maxWidth="md">
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ duration: 0.6 }}
+        >
           <Paper elevation={24} sx={{ p: 4, borderRadius: 3 }}>
             <Box textAlign="center" sx={{ mb: 4 }}>
-              <Typography variant="h3" sx={{ fontWeight: 700, background: 'linear-gradient(45deg, #2196F3, #21CBF3)', backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', mb: 1 }}>
+              <Typography variant="h3" sx={{ 
+                fontWeight: 700, 
+                background: 'linear-gradient(45deg, #2196F3, #21CBF3)', 
+                backgroundClip: 'text', 
+                WebkitBackgroundClip: 'text', 
+                WebkitTextFillColor: 'transparent', 
+                mb: 1 
+              }}>
                 🏠 MySpot
               </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>Create Your Account</Typography>
-              <Typography variant="body1" color="text.secondary">Join MySpot and find your perfect PG</Typography>
+              <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
+                Create Your PG Account
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                Register your PG with MySpot
+              </Typography>
             </Box>
 
             <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
               {steps.map((label) => (
-                <Step key={label}><StepLabel>{label}</StepLabel></Step>
+                <Step key={label}>
+                  <StepLabel>{label}</StepLabel>
+                </Step>
               ))}
             </Stepper>
 
@@ -332,7 +640,13 @@ const SignupPage = () => {
               <Box textAlign="center" sx={{ mt: 3 }}>
                 <Typography variant="body2" color="text.secondary">
                   Already have an account?{' '}
-                  <Button variant="text" onClick={() => navigate('/login')} sx={{ fontWeight: 600 }}>Sign In</Button>
+                  <Button 
+                    variant="text" 
+                    onClick={() => navigate('/login')} 
+                    sx={{ fontWeight: 600 }}
+                  >
+                    Sign In
+                  </Button>
                 </Typography>
               </Box>
             )}
@@ -343,4 +657,7 @@ const SignupPage = () => {
   );
 };
 
+
 export default SignupPage;
+
+
