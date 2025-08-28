@@ -2,7 +2,7 @@ import * as yup from 'yup';
 
 // Login validation - matches backend
 export const loginSchema = yup.object().shape({
-  email: yup
+  emailAddress: yup
     .string()
     .email('Please provide a valid email address')
     .required('Email address is required'),
@@ -11,33 +11,44 @@ export const loginSchema = yup.object().shape({
     .required('Password is required'),
 });
 
-// Registration validation - matches backend exactly
+// ✅ EXACT MATCH: PG Registration validation - matches PGRegistrationRequest exactly
 export const signupSchema = yup.object().shape({
-  fullName: yup
+  // Owner Details
+  pgName: yup
     .string()
-    .min(2, 'Full name must be between 2 and 100 characters')
-    .max(100, 'Full name must be between 2 and 100 characters')
-    .matches(/^[a-zA-Z\s.'-]+$/, 'Full name contains invalid characters')
-    .required('Full name is required'),
+    .max(200, 'PG name must not exceed 200 characters')
+    .required('PG name is required'),
   
-  email: yup
+  ownerName: yup
+    .string()
+    .max(100, 'Owner name must not exceed 100 characters')
+    .required('Owner name is required'),
+  
+  pgProfilePicture: yup
+    .string()
+    .max(500, 'Profile picture URL must not exceed 500 characters')
+    .optional(),
+
+  // Contact Information
+  emailAddress: yup
     .string()
     .email('Please provide a valid email address')
-    .max(150, 'Email address must not exceed 150 characters')
+    .max(150, 'Email must not exceed 150 characters')
     .required('Email address is required'),
   
-  mobile: yup
+  phoneNumber: yup
     .string()
-    .matches(/^[+]?[0-9]{10,15}$/, 'Please provide a valid mobile number')
-    .required('Mobile number is required'),
-  
+    .matches(/^[\+]?[0-9]{10,15}$/, 'Please provide a valid phone number')
+    .required('Phone number is required'),
+
+  // ✅ EXACT BACKEND MATCH: Only allows @$!%*?& special characters
   password: yup
     .string()
-    .min(8, 'Password must be between 8 and 128 characters')
-    .max(128, 'Password must be between 8 and 128 characters')
+    .min(8, 'Password must be 8–50 characters')
+    .max(50, 'Password must be 8–50 characters')
     .matches(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
-      'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character'
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).*$/,
+      'Password must contain uppercase, lowercase, digit, special character (@$!%*?&)'
     )
     .required('Password is required'),
   
@@ -45,52 +56,41 @@ export const signupSchema = yup.object().shape({
     .string()
     .oneOf([yup.ref('password')], 'Password and confirm password must match')
     .required('Password confirmation is required'),
-  
-  dateOfBirth: yup
-    .string()
-    .required('Date of birth is required')
-    .test('age', 'You must be at least 18 years old to register', function(value) {
-      if (!value) return false;
-      const birthDate = new Date(value);
-      const today = new Date();
-      const age = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        return age - 1 >= 18;
-      }
-      return age >= 18;
-    }),
-  
-  gender: yup
-    .string()
-    .oneOf(['MALE', 'FEMALE', 'OTHER'], 'Gender is required')
-    .required('Gender is required'),
-  
+
+  // Location Details
   city: yup
     .string()
-    .max(50, 'City name must not exceed 50 characters')
-    .optional(),
+    .max(50, 'City must not exceed 50 characters')
+    .required('City is required'),
   
   state: yup
     .string()
-    .max(50, 'State name must not exceed 50 characters')
-    .optional(),
+    .max(50, 'State must not exceed 50 characters')
+    .required('State is required'),
   
-  emergencyContactName: yup
+  country: yup
     .string()
-    .max(100, 'Emergency contact name must not exceed 100 characters')
-    .optional(),
+    .max(50, 'Country must not exceed 50 characters')
+    .required('Country is required'),
   
-  emergencyContactNumber: yup
+  pincode: yup
     .string()
-    .matches(/^[+]?[0-9]{10,15}$|^$/, 'Please provide a valid emergency contact number')
+    .matches(/^[0-9]{6}$/, 'Pincode must be 6 digits')
+    .required('Pincode is required'),
+  
+  latitude: yup
+    .number()
+    .min(-90, 'Latitude must be ≥ -90')
+    .max(90, 'Latitude must be ≤ 90')
     .optional(),
   
-  marketingConsent: yup
-    .boolean()
-    .default(false),
-  
+  longitude: yup
+    .number()
+    .min(-180, 'Longitude must be ≥ -180')
+    .max(180, 'Longitude must be ≤ 180')
+    .optional(),
+
+  // Terms acceptance
   acceptTerms: yup
     .boolean()
     .oneOf([true], 'You must accept the terms and conditions to register')
@@ -111,12 +111,12 @@ export const validateEmail = (email) => {
   return emailRegex.test(email);
 };
 
-export const validateMobile = (mobile) => {
-  const mobileRegex = /^[6-9]\d{9}$/;
-  return mobileRegex.test(mobile);
+export const validatePhone = (phone) => {
+  const phoneRegex = /^[\+]?[0-9]{10,15}$/;
+  return phoneRegex.test(phone);
 };
 
 export const validatePassword = (password) => {
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).*$/;
   return passwordRegex.test(password);
 };

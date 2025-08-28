@@ -1,7 +1,7 @@
-
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { authService } from '@/services/authService';
 import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext();
 
@@ -78,16 +78,26 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
-  // Step 1: Login (sends OTP)
   const login = async (credentials) => {
     try {
       dispatch({ type: 'AUTH_START' });
       const response = await authService.login(credentials);
-      dispatch({ type: 'OTP_SENT', payload: response });
-      toast.success('OTP sent to your email!');
-      return response;
+      
+      if (response && response.accessToken) {
+        dispatch({ type: 'AUTH_SUCCESS', payload: response });
+        toast.success('Login successful!');
+        return response;
+      }
     } catch (error) {
-      dispatch({ type: 'AUTH_FAIL', payload: error.message });
+      let errorMessage = 'Gmail and Password are wrong';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      dispatch({ type: 'AUTH_FAIL', payload: errorMessage });
       throw error;
     }
   };
@@ -117,11 +127,27 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    authService.logout();
+  // FIXED LOGOUT FUNCTION
+// FIND this existing logout function and REPLACE it with:
+const logout = async () => {
+  try {
+    // Call the logout service to invalidate tokens on server
+    await authService.logout();
+  } catch (error) {
+    console.error('Logout service error:', error);
+    // Continue with logout even if service fails
+  } finally {
+    // Always clear local state and tokens
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
     dispatch({ type: 'AUTH_LOGOUT' });
     toast.success('Logged out successfully!');
-  };
+    
+    // CHANGE THIS LINE: Navigate to logout page instead of login
+    window.location.href = '/logout'; // Changed from '/login' to '/logout'
+  }
+};
+
 
   const clearError = () => {
     dispatch({ type: 'CLEAR_ERROR' });

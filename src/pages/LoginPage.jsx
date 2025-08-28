@@ -6,7 +6,6 @@ import {
   Typography,
   TextField,
   Button,
-  Alert,
   CircularProgress,
   IconButton,
   InputAdornment,
@@ -39,8 +38,9 @@ const loginSchema = yup.object().shape({
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { login, isLoading, error, clearError, completeLogin } = useAuth();
+  const { login, isLoading, clearError, completeLogin } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(''); // ← Error under button
 
   const {
     control,
@@ -56,29 +56,42 @@ const LoginPage = () => {
   });
 
   React.useEffect(() => {
-    clearError();
+    if (clearError) clearError();
+    setErrorMessage(''); // Clear error when component loads
   }, [clearError]);
 
   const onSubmit = async (data) => {
     try {
-      // Directly login, backend returns tokens and user info if successful
+      setErrorMessage(''); // Clear previous error
+
       const authResponse = await login({
         emailAddress: data.emailAddress,
         password: data.password,
         rememberMe: data.rememberMe
       });
 
-      // Save tokens (if your AuthContext.login doesn't do this already)
       localStorage.setItem('accessToken', authResponse.accessToken);
       localStorage.setItem('refreshToken', authResponse.refreshToken);
 
-      // Update user context to logged in state
       await completeLogin(authResponse);
-
-      // Navigate to welcome/dashboard on success
-      navigate('/welcome');
+      navigate('/dashboard/overview');
     } catch (err) {
-      // Error handled by context, nothing to do here
+      console.error('Login error:', err);
+      console.error('Error response:', err.response);
+
+      if (err.response?.status === 401) {
+        setErrorMessage('Email and password are wrong');
+        console.log('Error message set:', 'Email and password are wrong');
+      } else if (err.response?.status === 403) {
+        setErrorMessage('Access forbidden. Please check your credentials or contact support.');
+        console.log('Error message set:', 'Access forbidden. Please check your credentials or contact support.');
+      } else if (err.response?.status === 404) {
+        setErrorMessage('Account not found');
+        console.log('Error message set:', 'Account not found');
+      } else {
+        setErrorMessage('Login failed. Please try again.');
+        console.log('Error message set:', 'Login failed. Please try again.');
+      }
     }
   };
 
@@ -127,8 +140,6 @@ const LoginPage = () => {
             </Box>
 
             <Box component="form" onSubmit={handleSubmit(onSubmit)}>
-              {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
               {/* Email Field */}
               <Controller
                 name="emailAddress"
@@ -189,15 +200,15 @@ const LoginPage = () => {
                   name="rememberMe"
                   control={control}
                   render={({ field }) => (
-                    <FormControlLabel 
-                      control={<Checkbox {...field} checked={field.value} />} 
-                      label="Remember me" 
+                    <FormControlLabel
+                      control={<Checkbox {...field} checked={field.value} />}
+                      label="Remember me"
                     />
                   )}
                 />
-                <Link 
-                  component="button" 
-                  variant="body2" 
+                <Link
+                  component="button"
+                  variant="body2"
                   onClick={handleForgotPassword}
                   type="button"
                 >
@@ -212,10 +223,26 @@ const LoginPage = () => {
                 variant="contained"
                 size="large"
                 disabled={isLoading}
-                sx={{ mb: 2, py: 1.5 }}
+                sx={{ mb: 1, py: 1.5 }}
               >
                 {isLoading ? <CircularProgress size={24} /> : 'Sign In'}
               </Button>
+
+              {/* ✅ ERROR MESSAGE UNDER LOGIN BUTTON */}
+              {errorMessage && (
+                <Box sx={{ textAlign: 'center', mb: 2 }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: 'error.main',
+                      fontWeight: 500,
+                      mt: 1
+                    }}
+                  >
+                    {errorMessage}
+                  </Typography>
+                </Box>
+              )}
 
               {/* Signup Link */}
               <Box textAlign="center">

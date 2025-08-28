@@ -22,19 +22,73 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
 
 const DashboardPage = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  // UPDATED LOGOUT FUNCTION
+  const handleLogout = async () => {
+    try {
+      console.log('Logout clicked'); // Debug log
+      
+      // Clear tokens immediately
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      
+      // Call the logout function from context
+      if (logout) {
+        await logout();
+      }
+      
+      // Force navigation to login
+      window.location.href = '/login';
+      
+    } catch (error) {
+      console.error('Logout failed:', error);
+      
+      // Fallback: force clear everything and redirect
+      localStorage.clear();
+      window.location.href = '/login';
+    }
+  };
+
+  // Rest of your existing code stays the same...
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Not provided';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short' 
+      });
+    } catch (error) {
+      return 'Not provided';
+    }
+  };
+
+  const formatFullDate = (dateString) => {
+    if (!dateString) return 'Not provided';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    } catch (error) {
+      return 'Not provided';
+    }
   };
 
   if (!user) {
-    return null; // or loading spinner
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Paper elevation={3} sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="h6">Loading user information...</Typography>
+        </Paper>
+      </Container>
+    );
   }
 
   return (
@@ -44,34 +98,47 @@ const DashboardPage = () => {
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Avatar 
-              src={user.profilePictureUrl} 
-              sx={{ mr: 2, width: 64, height: 64 }}
+              src={user.profilePictureUrl || ''} 
+              sx={{ mr: 2, width: 64, height: 64, bgcolor: 'primary.main' }}
             >
-              {user.fullName?.charAt(0).toUpperCase()}
+              {user.fullName?.charAt(0)?.toUpperCase() || 'U'}
             </Avatar>
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                Welcome, {user.fullName}!
+                Welcome, {user.fullName || 'User'}!
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                {user.emailAddress}
+                {user.emailAddress || 'No email provided'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Member since {format(new Date(user.createdAt), 'MMM yyyy')}
+                Member since {formatDate(user.createdAt)}
               </Typography>
             </Box>
           </Box>
+          
+          {/* UPDATED LOGOUT BUTTON */}
           <Button
-            variant="outlined"
+            variant="contained"
             startIcon={<ExitToApp />}
             onClick={handleLogout}
+            color="error"
+            sx={{
+              fontWeight: 600,
+              px: 3,
+              py: 1,
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 8px rgba(244, 67, 54, 0.3)',
+              },
+              transition: 'all 0.2s ease-in-out',
+            }}
           >
             Logout
           </Button>
         </Box>
       </Paper>
 
-      {/* User Info Cards */}
+      {/* Rest of your existing code... */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} md={4}>
           <Card>
@@ -81,10 +148,10 @@ const DashboardPage = () => {
                 <Typography variant="h6">Profile Information</Typography>
               </Box>
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                <strong>Mobile:</strong> {user.mobileNumber}
+                <strong>Mobile:</strong> {user.mobileNumber || 'Not provided'}
               </Typography>
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                <strong>Date of Birth:</strong> {user.dateOfBirth ? format(new Date(user.dateOfBirth), 'MMM dd, yyyy') : 'Not provided'}
+                <strong>Date of Birth:</strong> {formatFullDate(user.dateOfBirth)}
               </Typography>
               <Typography variant="body2" color="text.secondary" gutterBottom>
                 <strong>Gender:</strong> {user.gender || 'Not provided'}
@@ -107,7 +174,7 @@ const DashboardPage = () => {
                 <Typography variant="h6">My Bookings</Typography>
               </Box>
               <Typography variant="h3" color="primary.main" sx={{ fontWeight: 700 }}>
-                0
+                {user.bookingsCount || 0}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Active bookings
@@ -124,7 +191,7 @@ const DashboardPage = () => {
                 <Typography variant="h6">Favorites</Typography>
               </Box>
               <Typography variant="h3" color="primary.main" sx={{ fontWeight: 700 }}>
-                0
+                {user.favoritesCount || 0}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Saved properties

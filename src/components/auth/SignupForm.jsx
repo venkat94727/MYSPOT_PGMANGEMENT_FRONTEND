@@ -1,218 +1,182 @@
-
+/* -------------------------------------------------------------------
+   PG-OWNER SIGN-UP PAGE
+   ------------------------------------------------------------------- */
 import React, { useState, useEffect } from 'react';
 import {
   Box,
+  Grid,
   TextField,
   Button,
   IconButton,
   InputAdornment,
   FormControlLabel,
   Checkbox,
-  Link,
-  Divider,
   Alert,
   CircularProgress,
-  Grid,
-  MenuItem,
   Typography,
+  MenuItem
 } from '@mui/material';
 import {
-  Visibility,
-  VisibilityOff,
-  Google,
-  Facebook,
   Person,
   Email,
   Phone,
+  Business,
   Lock,
   LocationCity,
   Public,
-  Cake,
+  Visibility,
+  VisibilityOff
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
-import { signupSchema } from '@/utils/validation';
-import { useAuth } from '@/context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { authService } from '@/services/authService';
+import { signupSchema } from '@/utils/validation';          // ← PG schema
+import { authService } from '@/services/authService';      // ← PG mapping
 import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 
 const indianStates = [
-  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
-  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
-  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya',
-  'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim',
-  'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand',
-  'West Bengal', 'Delhi', 'Jammu and Kashmir', 'Ladakh'
+  'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa',
+  'Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala',
+  'Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland',
+  'Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura',
+  'Uttar Pradesh','Uttarakhand','West Bengal','Delhi','Jammu and Kashmir','Ladakh'
 ];
 
-const SignupForm = () => {
-  const navigate = useNavigate();
-  const { register: authRegister, isLoading: contextLoading, error: contextError, clearError } = useAuth();
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+export default function SignupPage() {
+  const navigate  = useNavigate();
+  const [showPw, setShowPw]                 = useState(false);
+  const [showConf, setShowConf]             = useState(false);
+  const [loading, setLoading]               = useState(false);
+  const [errorMsg, setErrorMsg]             = useState('');
 
+  /* ------------------------------------------------------------------
+     React-Hook-Form setup
+  ------------------------------------------------------------------ */
   const {
     control,
     handleSubmit,
     formState: { errors },
+    reset
   } = useForm({
     resolver: yupResolver(signupSchema),
     defaultValues: {
-      fullName: '',
-      email: '',
-      mobile: '',
+      pgName: '',
+      ownerName: '',
+      pgProfilePicture: '',
+      emailAddress: '',
+      phoneNumber: '',
       password: '',
       confirmPassword: '',
-      dateOfBirth: '',
-      gender: 'MALE',
       city: '',
       state: '',
-      emergencyContactName: '',
-      emergencyContactNumber: '',
-      marketingConsent: false,
-      acceptTerms: false,
-    },
+      country: 'India',
+      pincode: '',
+      latitude: '',
+      longitude: '',
+      acceptTerms: false
+    }
   });
 
-  useEffect(() => {
-    if (clearError) clearError();
-  }, [clearError]);
-
-  // ✅ UPDATED: Direct customer registration (no PG mapping needed)
+  /* ------------------------------------------------------------------
+     Submit handler
+  ------------------------------------------------------------------ */
   const onSubmit = async (data) => {
     try {
-      setIsLoading(true);
-      setError('');
-      
-      console.log('📝 Customer registration form data:', data);
+      setLoading(true);
+      setErrorMsg('');
 
-      // Prepare data for CustomerRegistrationRequest (direct mapping)
-      const registrationData = {
-        fullName: data.fullName?.trim(),
-        emailAddress: data.email?.trim(),
-        mobileNumber: data.mobile?.trim(),
-        password: data.password,
-        confirmPassword: data.confirmPassword,
-        dateOfBirth: data.dateOfBirth,
-        gender: data.gender,
-        acceptTerms: data.acceptTerms,
-        country: 'India',
-        preferredLanguage: 'en',
-        marketingConsent: data.marketingConsent || false,
-        
-        // Optional fields
-        ...(data.city?.trim() && { city: data.city.trim() }),
-        ...(data.state && { state: data.state }),
-        ...(data.emergencyContactName?.trim() && {
-          emergencyContactName: data.emergencyContactName.trim(),
-        }),
-        ...(data.emergencyContactNumber?.trim() && {
-          emergencyContactNumber: data.emergencyContactNumber.trim(),
-        }),
+      /* Parse numeric fields so Spring accepts them as BigDecimal -------- */
+      const payload = {
+        ...data,
+        latitude : data.latitude  ? parseFloat(data.latitude)  : undefined,
+        longitude: data.longitude ? parseFloat(data.longitude) : undefined
       };
+      /* ----------------------------------------------------------------- */
 
-      console.log('🚀 Customer registration payload:', registrationData);
-
-      // For customer registration, we need a different method or endpoint
-      // Option 1: Use context-based registration if available
-      if (authRegister) {
-        await authRegister(registrationData);
-        navigate('/dashboard');
-      } else {
-        // Option 2: Use direct API call for customer registration
-        // Note: You'll need a /customer-auth/register endpoint or modify the existing one
-        const response = await authService.register(registrationData);
-        console.log('✅ Customer registration successful:', response);
-        toast.success('Registration successful! Please verify your email.');
-        navigate('/verify-email');
-      }
-      
+      await authService.register(payload);
+      toast.success('Registration successful! Check your email for OTP.');
+      reset();                    // clear the form
+      navigate('/verify-email');  // adjust if your route is different
     } catch (err) {
-      console.error('❌ Customer registration failed:', err);
-      console.error('Error response:', err.response?.data);
-      
-      // Enhanced error handling
-      if (err.response?.status === 400) {
-        const responseData = err.response.data;
-        
-        if (responseData?.data && typeof responseData.data === 'object') {
-          const errorMessages = Object.values(responseData.data);
-          setError(`Validation errors: ${errorMessages.join(', ')}`);
-        } else if (responseData?.message) {
-          setError(responseData.message);
-        } else {
-          setError('Please check your form data and try again.');
-        }
-      } else if (err.response?.status === 409) {
-        const errorMessage = err.response.data?.message || '';
-        if (errorMessage.toLowerCase().includes('email')) {
-          setError('Email address already exists');
-        } else if (errorMessage.toLowerCase().includes('mobile') || errorMessage.toLowerCase().includes('phone')) {
-          setError('Mobile number already exists');
-        } else {
-          setError('Email or mobile number already exists');
-        }
-      } else if (err.response?.status === 500) {
-        setError('Server error. Please try again later.');
-      } else if (err.code === 'NETWORK_ERROR' || !err.response) {
-        setError('Network error. Please check your connection and try again.');
-      } else {
-        setError(err.response?.data?.message || err.message || 'Registration failed. Please try again.');
-      }
+      console.error(err);
+      const msg =
+        err.response?.data?.message ||
+        err.message ||
+        'Registration failed – please try again.';
+      setErrorMsg(msg);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const displayError = error || contextError;
-  const displayLoading = isLoading || contextLoading;
+  /* ------------------------------------------------------------------
+     Render helpers
+  ------------------------------------------------------------------ */
+  const adorn = (icon) => (
+    <InputAdornment position="start">{icon}</InputAdornment>
+  );
 
+  /* ------------------------------------------------------------------
+     JSX
+  ------------------------------------------------------------------ */
   return (
     <Box
       component="form"
       onSubmit={handleSubmit(onSubmit)}
+      sx={{ maxWidth: 650, mx: 'auto', p: 3 }}
       noValidate
     >
-      {displayError && (
+      <Typography variant="h5" fontWeight={600} gutterBottom>
+        Register Your PG
+      </Typography>
+
+      {errorMsg && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {displayError}
+          {errorMsg}
         </Alert>
       )}
 
-      <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: 'primary.main' }}>
-        Required Information
-      </Typography>
-
       <Grid container spacing={2}>
+        {/* PG Name ------------------------------------------------------ */}
         <Grid item xs={12}>
           <Controller
-            name="fullName"
+            name="pgName"
             control={control}
             render={({ field }) => (
               <TextField
                 {...field}
                 fullWidth
-                label="Full Name *"
-                error={!!errors.fullName}
-                helperText={errors.fullName?.message}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Person color="primary" />
-                    </InputAdornment>
-                  ),
-                }}
+                label="PG / Property Name *"
+                error={!!errors.pgName}
+                helperText={errors.pgName?.message}
+                InputProps={ { startAdornment: adorn(<Business />) } }
               />
             )}
           />
         </Grid>
 
+        {/* Owner Name --------------------------------------------------- */}
+        <Grid item xs={12}>
+          <Controller
+            name="ownerName"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                fullWidth
+                label="Owner Name *"
+                error={!!errors.ownerName}
+                helperText={errors.ownerName?.message}
+                InputProps={ { startAdornment: adorn(<Person />) } }
+              />
+            )}
+          />
+        </Grid>
+
+        {/* Email + Phone ---------------------------------------------- */}
         <Grid item xs={12} sm={6}>
           <Controller
-            name="email"
+            name="emailAddress"
             control={control}
             render={({ field }) => (
               <TextField
@@ -220,97 +184,32 @@ const SignupForm = () => {
                 fullWidth
                 label="Email Address *"
                 type="email"
-                error={!!errors.email}
-                helperText={errors.email?.message}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Email color="primary" />
-                    </InputAdornment>
-                  ),
-                }}
+                error={!!errors.emailAddress}
+                helperText={errors.emailAddress?.message}
+                InputProps={ { startAdornment: adorn(<Email />) } }
               />
             )}
           />
         </Grid>
-
         <Grid item xs={12} sm={6}>
           <Controller
-            name="mobile"
+            name="phoneNumber"
             control={control}
             render={({ field }) => (
               <TextField
                 {...field}
                 fullWidth
-                label="Mobile Number *"
-                placeholder="e.g., 9876543210"
-                error={!!errors.mobile}
-                helperText={errors.mobile?.message}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Phone color="primary" />
-                    </InputAdornment>
-                  ),
-                }}
+                label="Phone Number *"
+                placeholder="+91XXXXXXXXXX"
+                error={!!errors.phoneNumber}
+                helperText={errors.phoneNumber?.message}
+                InputProps={ { startAdornment: adorn(<Phone />) } }
               />
             )}
           />
         </Grid>
 
-        <Grid item xs={12} sm={6}>
-          <Controller
-            name="dateOfBirth"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                {...field}
-                fullWidth
-                label="Date of Birth *"
-                type="date"
-                error={!!errors.dateOfBirth}
-                helperText={errors.dateOfBirth?.message}
-                InputLabelProps={{ shrink: true }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Cake color="primary" />
-                    </InputAdornment>
-                  ),
-                }}
-                inputProps={{
-                  max: new Date(
-                    new Date().setFullYear(new Date().getFullYear() - 18)
-                  )
-                    .toISOString()
-                    .split('T')[0],
-                }}
-              />
-            )}
-          />
-        </Grid>
-
-        <Grid item xs={12} sm={6}>
-          <Controller
-            name="gender"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                {...field}
-                fullWidth
-                select
-                label="Gender *"
-                error={!!errors.gender}
-                helperText={errors.gender?.message}
-              >
-                <MenuItem value="MALE">Male</MenuItem>
-                <MenuItem value="FEMALE">Female</MenuItem>
-                <MenuItem value="OTHER">Other</MenuItem>
-              </TextField>
-            )}
-          />
-        </Grid>
-
+        {/* Password ----------------------------------------------------- */}
         <Grid item xs={12} sm={6}>
           <Controller
             name="password"
@@ -320,31 +219,23 @@ const SignupForm = () => {
                 {...field}
                 fullWidth
                 label="Password *"
-                type={showPassword ? 'text' : 'password'}
+                type={showPw ? 'text' : 'password'}
                 error={!!errors.password}
                 helperText={errors.password?.message}
                 InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Lock color="primary" />
-                    </InputAdornment>
-                  ),
+                  startAdornment: adorn(<Lock />),
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowPassword(!showPassword)}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      <IconButton onClick={() => setShowPw(!showPw)}>
+                        {showPw ? <VisibilityOff /> : <Visibility />}
                       </IconButton>
                     </InputAdornment>
-                  ),
+                  )
                 }}
               />
             )}
           />
         </Grid>
-
         <Grid item xs={12} sm={6}>
           <Controller
             name="confirmPassword"
@@ -354,45 +245,25 @@ const SignupForm = () => {
                 {...field}
                 fullWidth
                 label="Confirm Password *"
-                type={showConfirmPassword ? 'text' : 'password'}
+                type={showConf ? 'text' : 'password'}
                 error={!!errors.confirmPassword}
                 helperText={errors.confirmPassword?.message}
                 InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Lock color="primary" />
-                    </InputAdornment>
-                  ),
+                  startAdornment: adorn(<Lock />),
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton
-                        onClick={() =>
-                          setShowConfirmPassword(!showConfirmPassword)
-                        }
-                        edge="end"
-                      >
-                        {showConfirmPassword ? (
-                          <VisibilityOff />
-                        ) : (
-                          <Visibility />
-                        )}
+                      <IconButton onClick={() => setShowConf(!showConf)}>
+                        {showConf ? <VisibilityOff /> : <Visibility />}
                       </IconButton>
                     </InputAdornment>
-                  ),
+                  )
                 }}
               />
             )}
           />
         </Grid>
-      </Grid>
 
-      <Divider sx={{ my: 3 }} />
-
-      <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-        Additional Information (Optional)
-      </Typography>
-
-      <Grid container spacing={2}>
+        {/* Location ----------------------------------------------------- */}
         <Grid item xs={12} sm={6}>
           <Controller
             name="city"
@@ -401,21 +272,14 @@ const SignupForm = () => {
               <TextField
                 {...field}
                 fullWidth
-                label="City"
+                label="City *"
                 error={!!errors.city}
                 helperText={errors.city?.message}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <LocationCity color="primary" />
-                    </InputAdornment>
-                  ),
-                }}
+                InputProps={ { startAdornment: adorn(<LocationCity />) } }
               />
             )}
           />
         </Grid>
-
         <Grid item xs={12} sm={6}>
           <Controller
             name="state"
@@ -423,170 +287,117 @@ const SignupForm = () => {
             render={({ field }) => (
               <TextField
                 {...field}
-                fullWidth
                 select
-                label="State"
+                fullWidth
+                label="State *"
                 error={!!errors.state}
                 helperText={errors.state?.message}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Public color="primary" />
-                    </InputAdornment>
-                  ),
-                }}
+                InputProps={ { startAdornment: adorn(<Public />) } }
               >
-                <MenuItem value="">Select State</MenuItem>
                 {indianStates.map((st) => (
                   <MenuItem key={st} value={st}>
                     {st}
                   </MenuItem>
                 ))}
               </TextField>
-            )} 
+            )}
           />
         </Grid>
-
         <Grid item xs={12} sm={6}>
           <Controller
-            name="emergencyContactName"
+            name="country"
             control={control}
             render={({ field }) => (
               <TextField
                 {...field}
                 fullWidth
-                label="Emergency Contact Name"
-                error={!!errors.emergencyContactName}
-                helperText={errors.emergencyContactName?.message}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Person color="primary" />
-                    </InputAdornment>
-                  ),
-                }}
+                label="Country *"
+                disabled          // always India, adjust if needed
+                InputProps={ { startAdornment: adorn(<Public />) } }
               />
             )}
           />
         </Grid>
-
         <Grid item xs={12} sm={6}>
           <Controller
-            name="emergencyContactNumber"
+            name="pincode"
             control={control}
             render={({ field }) => (
               <TextField
                 {...field}
                 fullWidth
-                label="Emergency Contact Number"
-                placeholder="e.g., 9876543210"
-                error={!!errors.emergencyContactNumber}
-                helperText={errors.emergencyContactNumber?.message}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Phone color="primary" />
-                    </InputAdornment>
-                  ),
-                }}
+                label="Pincode *"
+                error={!!errors.pincode}
+                helperText={errors.pincode?.message}
               />
             )}
           />
+        </Grid>
+
+        {/* Co-ordinates (optional) ------------------------------------- */}
+        <Grid item xs={12} sm={6}>
+          <Controller
+            name="latitude"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                fullWidth
+                label="Latitude"
+                placeholder="-90 to 90"
+                error={!!errors.latitude}
+                helperText={errors.latitude?.message}
+              />
+            )}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <Controller
+            name="longitude"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                fullWidth
+                label="Longitude"
+                placeholder="-180 to 180"
+                error={!!errors.longitude}
+                helperText={errors.longitude?.message}
+              />
+            )}
+          />
+        </Grid>
+
+        {/* Terms -------------------------------------------------------- */}
+        <Grid item xs={12}>
+          <Controller
+            name="acceptTerms"
+            control={control}
+            render={({ field }) => (
+              <FormControlLabel
+                control={<Checkbox {...field} checked={field.value} />}
+                label="I agree to the Terms of Service and Privacy Policy *"
+              />
+            )}
+          />
+          {errors.acceptTerms && (
+            <Typography variant="caption" color="error">
+              {errors.acceptTerms.message}
+            </Typography>
+          )}
         </Grid>
       </Grid>
 
-      <Box sx={{ mt: 3 }}>
-        <Controller
-          name="marketingConsent"
-          control={control}
-          render={({ field }) => (
-            <FormControlLabel
-              control={<Checkbox {...field} checked={field.value} />}
-              label="I want to receive updates and promotional emails from MySpot"
-            />
-          )}
-        />
-
-        <Controller
-          name="acceptTerms"
-          control={control}
-          render={({ field }) => (
-            <FormControlLabel
-              control={<Checkbox {...field} checked={field.value} />}
-              label={
-                <Box>
-                  I agree to the{' '}
-                  <Link href="#" underline="hover">
-                    Terms of Service
-                  </Link>{' '}
-                  and{' '}
-                  <Link href="#" underline="hover">
-                    Privacy Policy
-                  </Link>{' '}
-                  *
-                </Box>
-              }
-            />
-          )}
-        />
-        {errors.acceptTerms && (
-          <Typography variant="caption" color="error" sx={{ ml: 4 }}>
-            {errors.acceptTerms.message}
-          </Typography>
-        )}
-      </Box>
-
+      {/* Submit Button -------------------------------------------------- */}
       <Button
         type="submit"
         fullWidth
         variant="contained"
-        size="large"
-        disabled={displayLoading}
-        sx={{ mt: 3, mb: 2, py: 1.5 }}
+        sx={{ mt: 3 }}
+        disabled={loading}
       >
-        {displayLoading ? <CircularProgress size={24} /> : 'Create Account'}
+        {loading ? <CircularProgress size={22} /> : 'Create Account'}
       </Button>
-
-      <Divider sx={{ mb: 2 }}>
-        <Box component="span" sx={{ px: 2, color: 'text.secondary' }}>
-          or sign up with
-        </Box>
-      </Divider>
-
-      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-        <Button
-          fullWidth
-          variant="outlined"
-          startIcon={<Google />}
-          onClick={() => console.log('Google signup')}
-        >
-          Google
-        </Button>
-        <Button
-          fullWidth
-          variant="outlined"
-          startIcon={<Facebook />}
-          onClick={() => console.log('Facebook signup')}
-        >
-          Facebook
-        </Button>
-      </Box>
-
-      <Box textAlign="center">
-        <Typography variant="body2" color="text.secondary">
-          Already have an account?{' '}
-        </Typography>
-        <Link
-          component="button"
-          variant="body1"
-          onClick={() => navigate('/login')}
-          sx={{ fontWeight: 600 }}
-        >
-          Sign in
-        </Link>
-      </Box>
     </Box>
   );
-};
-
-export default SignupForm;
+}

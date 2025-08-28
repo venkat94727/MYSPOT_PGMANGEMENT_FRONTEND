@@ -80,10 +80,11 @@ const LoginForm = () => {
   };
 
   const handleOtpVerification = async (authResponse) => {
-    await completeLogin(authResponse);
-    navigate('/dashboard');
-  };
-
+  await completeLogin(authResponse);
+  
+  // UPDATED: Navigate to dashboard instead of dashboard
+  navigate('/dashboard/overview');
+};
   const handleBack = () => {
     setShowOtpForm(false);
     setUserEmail('');

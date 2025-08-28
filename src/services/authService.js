@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9000';
@@ -53,37 +52,36 @@ class AuthService {
     return data;
   }
 
-  // ✅ UPDATED: Maps PG registration fields to CustomerRegistrationRequest structure
+  // ✅ FIXED: Correctly maps to PGRegistrationRequest structure (not CustomerRegistrationRequest)
   async register(userData) {
     console.log('🔍 PG Registration data received:', userData);
     
+    // Create payload matching EXACT PGRegistrationRequest structure from backend
     const payload = {
-      // Required fields for CustomerRegistrationRequest DTO
-      fullName: userData.ownerName || userData.pgName || 'PG Owner',
-      emailAddress: userData.emailAddress,
-      mobileNumber: userData.phoneNumber,               // Map phoneNumber to mobileNumber
-      dateOfBirth: '1990-01-01',                       // Default date (required field)
-      gender: 'MALE',                                  // Default gender (required field)
+      // Owner Details (Required)
+      pgName: userData.pgName?.trim(),
+      ownerName: userData.ownerName?.trim(),
+      pgProfilePicture: userData.pgProfilePicture?.trim() || null,
+      
+      // Contact Information (Required)
+      emailAddress: userData.emailAddress?.trim(),
+      phoneNumber: userData.phoneNumber?.trim(),
       password: userData.password,
       confirmPassword: userData.confirmPassword,
-      acceptTerms: userData.acceptTerms || true,
       
-      // Optional fields
-      country: userData.country || 'India',
-      preferredLanguage: 'en',
-      marketingConsent: false,
+      // Location Details (Required)
+      city: userData.city?.trim(),
+      state: userData.state?.trim(),
+      country: userData.country?.trim() || 'India',
+      pincode: userData.pincode?.trim(),
       
-      // Map PG location info
-      ...(userData.city && { city: userData.city }),
-      ...(userData.state && { state: userData.state }),
-      
-      // Store PG-specific data in emergency contact fields (creative mapping)
-      ...(userData.pgName && { emergencyContactName: userData.pgName }),
-      ...(userData.pincode && { emergencyContactNumber: userData.pincode }),
+      // Coordinates (Optional - converted to BigDecimal compatible format)
+      ...(userData.latitude && { latitude: parseFloat(userData.latitude) }),
+      ...(userData.longitude && { longitude: parseFloat(userData.longitude) }),
     };
     
-    console.log('🚀 Mapped payload for CustomerRegistrationRequest:', payload);
-    console.log('📋 JSON:', JSON.stringify(payload, null, 2));
+    console.log('🚀 Final payload for PGRegistrationRequest:', payload);
+    console.log('📋 JSON payload:', JSON.stringify(payload, null, 2));
     
     const response = await apiClient.post('/pg-auth/register', payload);
     return response.data.data;
