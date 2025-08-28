@@ -14,7 +14,8 @@ import {
 const PGManagementPage = () => {
   const [editMode, setEditMode] = useState(false);
   const [pgData, setPgData] = useState({
-    // Basic PG Information (pgId removed)
+    // Basic PG Information
+    pgId: 'PG001',
     pgName: 'Comfort PG',
     pgDescription: 'Premium PG accommodation with modern amenities',
     pgType: 'Premium',
@@ -201,7 +202,7 @@ const PGManagementPage = () => {
       discountPercentage: 10
     },
 
-    // Owner Information (Always read-only)
+    // Owner Information
     owner: {
       ownerId: 'OWN001',
       ownerName: 'John Doe',
@@ -305,7 +306,15 @@ const PGManagementPage = () => {
         </AccordionSummary>
         <AccordionDetails>
           <Grid container spacing={3}>
-            {/* REMOVED PG ID FIELD */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="PG ID"
+                value={pgData.pgId}
+                disabled={!editMode}
+                onChange={(e) => handleInputChange(null, 'pgId', e.target.value)}
+              />
+            </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
@@ -313,6 +322,17 @@ const PGManagementPage = () => {
                 value={pgData.pgName}
                 disabled={!editMode}
                 onChange={(e) => handleInputChange(null, 'pgName', e.target.value)}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label="PG Description"
+                value={pgData.pgDescription}
+                disabled={!editMode}
+                onChange={(e) => handleInputChange(null, 'pgDescription', e.target.value)}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -328,17 +348,6 @@ const PGManagementPage = () => {
                   <MenuItem value="Luxury">Luxury</MenuItem>
                 </Select>
               </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                multiline
-                rows={3}
-                label="PG Description"
-                value={pgData.pgDescription}
-                disabled={!editMode}
-                onChange={(e) => handleInputChange(null, 'pgDescription', e.target.value)}
-              />
             </Grid>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
@@ -395,134 +404,6 @@ const PGManagementPage = () => {
           </Grid>
         </AccordionDetails>
       </Accordion>
-
-      {/* PG Pictures & Descriptions */}
-<Accordion>
-  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-    <Typography variant="h6" sx={{ fontWeight: 600 }}>PG Pictures & Descriptions</Typography>
-  </AccordionSummary>
-  <AccordionDetails>
-    <Grid container spacing={3}>
-      <Grid item xs={12}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
-          PG Image Gallery with Descriptions
-        </Typography>
-      </Grid>
-      
-      {/* Display existing PG pictures with descriptions */}
-      {Object.entries(pgData.pgMap || {}).map(([imageUrl, description], index) => (
-        <Grid item xs={12} sm={6} md={4} key={index}>
-          <Card sx={{ border: 1, borderColor: 'grey.300' }}>
-            <CardContent>
-              <Box
-                sx={{
-                  width: '100%',
-                  height: 200,
-                  bgcolor: '#f5f5f5',
-                  borderRadius: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  mb: 2,
-                  border: '1px dashed #ccc',
-                  backgroundImage: imageUrl ? `url(${imageUrl})` : 'none',
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center'
-                }}
-              >
-                {!imageUrl && <PhotoIcon sx={{ fontSize: 60, color: '#999' }} />}
-              </Box>
-              <TextField
-                fullWidth
-                label="Image Description"
-                value={description || ''}
-                disabled={!editMode}
-                multiline
-                rows={2}
-                onChange={(e) => {
-                  const newPgMap = { ...pgData.pgMap };
-                  newPgMap[imageUrl] = e.target.value;
-                  setPgData(prev => ({ ...prev, pgMap: newPgMap }));
-                }}
-                sx={{ mb: 2 }}
-              />
-              {editMode && (
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<UploadIcon />}
-                    onClick={() => {
-                      // Handle image upload
-                      console.log('Upload image for index:', index);
-                    }}
-                  >
-                    Change Image
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    color="error"
-                    startIcon={<DeleteIcon />}
-                    onClick={() => {
-                      const newPgMap = { ...pgData.pgMap };
-                      delete newPgMap[imageUrl];
-                      setPgData(prev => ({ ...prev, pgMap: newPgMap }));
-                    }}
-                  >
-                    Remove
-                  </Button>
-                </Box>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-      ))}
-
-      {/* Add new image section (only in edit mode) */}
-      {editMode && (
-        <Grid item xs={12} sm={6} md={4}>
-          <Card sx={{ border: 2, borderColor: 'primary.main', borderStyle: 'dashed' }}>
-            <CardContent sx={{ textAlign: 'center', py: 4 }}>
-              <UploadIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
-              <Typography variant="h6" color="primary.main" gutterBottom>
-                Add New Image
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Upload a new PG image with description
-              </Typography>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => {
-                  // Handle new image upload
-                  const newImageUrl = 'new-image-placeholder.jpg'; // This would come from actual upload
-                  const newPgMap = { ...pgData.pgMap };
-                  newPgMap[newImageUrl] = 'New image description';
-                  setPgData(prev => ({ ...prev, pgMap: newPgMap }));
-                }}
-              >
-                Add Image
-              </Button>
-            </CardContent>
-          </Card>
-        </Grid>
-      )}
-
-      {/* Instructions */}
-      <Grid item xs={12}>
-        <Paper sx={{ p: 2, bgcolor: '#f8f9fa', border: 1, borderColor: 'grey.200' }}>
-          <Typography variant="body2" color="text.secondary">
-            <strong>Instructions:</strong> Upload high-quality images of your PG including exterior, 
-            common areas, rooms, and facilities. Add descriptive text for each image to help potential 
-            guests understand what they're seeing. Supported formats: JPG, PNG, GIF. Maximum size: 5MB per image.
-          </Typography>
-        </Paper>
-      </Grid>
-    </Grid>
-  </AccordionDetails>
-</Accordion>
-
 
       {/* Address Information */}
       <Accordion>
@@ -1197,12 +1078,10 @@ const PGManagementPage = () => {
         </AccordionDetails>
       </Accordion>
 
-      {/* Owner Information - ALWAYS DISABLED */}
+      {/* Owner Information */}
       <Accordion>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-            Owner Information (Read Only)
-          </Typography>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>Owner Information</Typography>
         </AccordionSummary>
         <AccordionDetails>
           <Grid container spacing={3}>
@@ -1211,8 +1090,8 @@ const PGManagementPage = () => {
                 fullWidth
                 label="Owner ID"
                 value={pgData.owner.ownerId}
-                disabled={true} // ALWAYS DISABLED
-                variant="filled"
+                disabled={!editMode}
+                onChange={(e) => handleInputChange('owner', 'ownerId', e.target.value)}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -1220,8 +1099,8 @@ const PGManagementPage = () => {
                 fullWidth
                 label="Owner Name"
                 value={pgData.owner.ownerName}
-                disabled={true} // ALWAYS DISABLED
-                variant="filled"
+                disabled={!editMode}
+                onChange={(e) => handleInputChange('owner', 'ownerName', e.target.value)}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -1229,8 +1108,8 @@ const PGManagementPage = () => {
                 fullWidth
                 label="Owner Email"
                 value={pgData.owner.ownerEmail}
-                disabled={true} // ALWAYS DISABLED
-                variant="filled"
+                disabled={!editMode}
+                onChange={(e) => handleInputChange('owner', 'ownerEmail', e.target.value)}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -1238,8 +1117,8 @@ const PGManagementPage = () => {
                 fullWidth
                 label="Owner Mobile Number"
                 value={pgData.owner.ownerMobileNumber}
-                disabled={true} // ALWAYS DISABLED
-                variant="filled"
+                disabled={!editMode}
+                onChange={(e) => handleInputChange('owner', 'ownerMobileNumber', e.target.value)}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -1247,8 +1126,8 @@ const PGManagementPage = () => {
                 fullWidth
                 label="Owner Alternate Mobile"
                 value={pgData.owner.ownerAlternateMobile}
-                disabled={true} // ALWAYS DISABLED
-                variant="filled"
+                disabled={!editMode}
+                onChange={(e) => handleInputChange('owner', 'ownerAlternateMobile', e.target.value)}
               />
             </Grid>
           </Grid>
