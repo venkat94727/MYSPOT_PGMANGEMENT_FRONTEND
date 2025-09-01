@@ -52,8 +52,33 @@ class AuthService {
     return data;
   }
 
-  // ✅ FIXED: Correctly maps to PGRegistrationRequest structure (not CustomerRegistrationRequest)
+  // 🆕 NEW METHOD: Register with FormData for file upload support
+  async registerWithFile(formData) {
+    console.log('🚀 AuthService: Sending registration with FormData...');
+    
+    try {
+      // Use direct axios call (not apiClient) to avoid Content-Type header conflicts
+      const response = await axios.post(`${API_BASE_URL}/pg-auth/register`, formData, {
+        timeout: 60000, // 60 seconds for file upload
+        headers: {
+          // Don't set Content-Type - let browser set it with boundary for multipart/form-data
+          ...(localStorage.getItem('accessToken') && {
+            Authorization: `Bearer ${localStorage.getItem('accessToken')}`
+          })
+        }
+      });
+
+      console.log('✅ AuthService: Registration with file successful:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ AuthService: Registration with file failed:', error);
+      throw error;
+    }
+  }
+
+  // 🔄 EXISTING METHOD: Keep for backward compatibility
   async register(userData) {
+    console.warn('⚠️ Using deprecated register method. Consider using registerWithFile for file upload support.');
     console.log('🔍 PG Registration data received:', userData);
     
     // Create payload matching EXACT PGRegistrationRequest structure from backend
@@ -127,6 +152,31 @@ class AuthService {
     const data = response.data.data;
     localStorage.setItem('accessToken', data.accessToken);
     return data.accessToken;
+  }
+
+  // 🆕 NEW METHOD: Update profile picture after registration
+  async updateProfilePicture(profilePictureFile, pgId) {
+    console.log('📸 AuthService: Updating profile picture...');
+    
+    try {
+      const formData = new FormData();
+      formData.append('profilePicture', profilePictureFile);
+      formData.append('pgId', pgId.toString());
+
+      const response = await axios.post(`${API_BASE_URL}/pg-auth/update-profile-picture`, formData, {
+        timeout: 60000,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('accessToken')}`
+          // Don't set Content-Type for multipart/form-data
+        }
+      });
+
+      console.log('✅ AuthService: Profile picture updated:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ AuthService: Profile picture update failed:', error);
+      throw error;
+    }
   }
 
   isAuthenticated() {

@@ -1,29 +1,32 @@
-// src/services/imageService.js
+
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9000';
 
 class ImageService {
-
+  
   /**
-   * Upload PG Profile Picture
+   * Upload PG Profile Picture using the new backend endpoint
    * @param {File} file - The image file to upload
-   * @param {string} pgId - The PG ID
+   * @param {string|number} pgId - The PG ID
    * @returns {Promise} - Promise with upload response
    */
   async uploadPGProfilePicture(file, pgId) {
     try {
       const formData = new FormData();
-      formData.append('profilePicture', file);
+      formData.append('file', file);
       formData.append('pgId', pgId);
 
+      const token = localStorage.getItem('accessToken');
+      
       const response = await axios.post(
-        `${API_BASE_URL}/pg/profile-picture`,
+        `${API_BASE_URL}/pg-auth/upload-profile-picture`,
         formData,
         {
           headers: {
             'Content-Type': 'multipart/form-data',
-          },
+            'Authorization': `Bearer ${token}`
+          }
         }
       );
 
@@ -34,85 +37,51 @@ class ImageService {
   }
 
   /**
-   * Upload multiple PG pictures
-   * @param {FileList} files - Array of image files
-   * @param {string} pgId - The PG ID
-   * @returns {Promise} - Promise with upload response
+   * Update existing profile picture
+   * @param {string|number} pgId - The PG ID
+   * @param {File} file - The new image file
+   * @returns {Promise} - Promise with update response
    */
-  async uploadPGPictures(files, pgId) {
+  async updatePGProfilePicture(pgId, file) {
     try {
       const formData = new FormData();
+      formData.append('file', file);
 
-      // Append each file to FormData
-      Array.from(files).forEach((file, index) => {
-        formData.append(`pgPictures`, file);
-      });
-
-      formData.append('pgId', pgId);
-
-      const response = await axios.post(
-        `${API_BASE_URL}/pg/pictures`,
+      const token = localStorage.getItem('accessToken');
+      
+      const response = await axios.put(
+        `${API_BASE_URL}/pg-auth/update-profile-picture/${pgId}`,
         formData,
         {
           headers: {
             'Content-Type': 'multipart/form-data',
-          },
+            'Authorization': `Bearer ${token}`
+          }
         }
       );
 
       return response.data;
     } catch (error) {
-      throw new Error(`PG pictures upload failed: ${error.response?.data?.message || error.message}`);
-    }
-  }
-
-  /**
-   * Update PG picture description
-   * @param {string} pgId - The PG ID
-   * @param {string} pictureId - The picture ID
-   * @param {string} description - New description
-   * @returns {Promise} - Promise with update response
-   */
-  async updatePGPictureDescription(pgId, pictureId, description) {
-    try {
-      const response = await axios.patch(
-        `${API_BASE_URL}/pg/${pgId}/pictures/${pictureId}`,
-        { description }
-      );
-
-      return response.data;
-    } catch (error) {
-      throw new Error(`Description update failed: ${error.response?.data?.message || error.message}`);
-    }
-  }
-
-  /**
-   * Delete PG picture
-   * @param {string} pgId - The PG ID
-   * @param {string} pictureId - The picture ID to delete
-   * @returns {Promise} - Promise with delete response
-   */
-  async deletePGPicture(pgId, pictureId) {
-    try {
-      const response = await axios.delete(
-        `${API_BASE_URL}/pg/${pgId}/pictures/${pictureId}`
-      );
-
-      return response.data;
-    } catch (error) {
-      throw new Error(`Picture deletion failed: ${error.response?.data?.message || error.message}`);
+      throw new Error(`Profile picture update failed: ${error.response?.data?.message || error.message}`);
     }
   }
 
   /**
    * Delete PG profile picture
-   * @param {string} pgId - The PG ID
+   * @param {string|number} pgId - The PG ID
    * @returns {Promise} - Promise with delete response
    */
   async deletePGProfilePicture(pgId) {
     try {
+      const token = localStorage.getItem('accessToken');
+      
       const response = await axios.delete(
-        `${API_BASE_URL}/pg/${pgId}/profile-picture`
+        `${API_BASE_URL}/pg-auth/delete-profile-picture/${pgId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
       );
 
       return response.data;
@@ -122,16 +91,26 @@ class ImageService {
   }
 
   /**
-   * Get all PG pictures
-   * @param {string} pgId - The PG ID
-   * @returns {Promise} - Promise with pictures data
+   * Get PG profile data including picture URL
+   * @param {string|number} pgId - The PG ID
+   * @returns {Promise} - Promise with profile data
    */
-  async getPGPictures(pgId) {
+  async getPGProfile(pgId) {
     try {
-      const response = await axios.get(`${API_BASE_URL}/pg/${pgId}/pictures`);
+      const token = localStorage.getItem('accessToken');
+      
+      const response = await axios.get(
+        `${API_BASE_URL}/pg-auth/profile/${pgId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
       return response.data;
     } catch (error) {
-      throw new Error(`Failed to fetch PG pictures: ${error.response?.data?.message || error.message}`);
+      throw new Error(`Failed to fetch PG profile: ${error.response?.data?.message || error.message}`);
     }
   }
 
@@ -142,7 +121,7 @@ class ImageService {
    */
   validateImageFile(file) {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const maxSize = 10 * 1024 * 1024; // 10MB
 
     if (!allowedTypes.includes(file.type)) {
       return {
@@ -154,7 +133,7 @@ class ImageService {
     if (file.size > maxSize) {
       return {
         isValid: false,
-        error: 'File size should be less than 5MB'
+        error: 'File size should be less than 10MB'
       };
     }
 
@@ -173,6 +152,46 @@ class ImageService {
       reader.onerror = (e) => reject(e);
       reader.readAsDataURL(file);
     });
+  }
+
+  /**
+   * Check if image URL is accessible
+   * @param {string} imageUrl - Image URL to check
+   * @returns {Promise<boolean>} - Promise resolving to true if accessible
+   */
+  async checkImageAccessibility(imageUrl) {
+    try {
+      const response = await fetch(imageUrl, { method: 'HEAD' });
+      return response.ok;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Generate optimized image URL with query parameters
+   * @param {string} imageUrl - Base image URL
+   * @param {Object} options - Optimization options
+   * @returns {string} - Optimized image URL
+   */
+  getOptimizedImageUrl(imageUrl, options = {}) {
+    if (!imageUrl) return null;
+    
+    const {
+      width = null,
+      height = null,
+      quality = 80,
+      format = null
+    } = options;
+
+    const url = new URL(imageUrl);
+    
+    if (width) url.searchParams.set('w', width);
+    if (height) url.searchParams.set('h', height);
+    if (quality !== 80) url.searchParams.set('q', quality);
+    if (format) url.searchParams.set('format', format);
+
+    return url.toString();
   }
 }
 

@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Box, Container, Paper, Typography, TextField, Button, Grid, MenuItem,
   FormControlLabel, Checkbox, Alert, CircularProgress,
-  IconButton, InputAdornment, Stepper, Step, StepLabel
+  IconButton, InputAdornment, Stepper, Step, StepLabel, Divider
 } from '@mui/material';
 import {
   Visibility, VisibilityOff, Person, Email, Phone, Lock, Business, LocationOn
@@ -15,8 +14,17 @@ import { authService } from '@/services/authService';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
+import ProfilePictureUpload from '@/components/ProfilePictureUpload';
 
 const steps = ['Registration', 'OTP Verification', 'Complete'];
+
+const indianStates = [
+  'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa',
+  'Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala',
+  'Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland',
+  'Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura',
+  'Uttar Pradesh','Uttarakhand','West Bengal','Delhi','Jammu and Kashmir','Ladakh'
+];
 
 const SignupPage = () => {
   const navigate = useNavigate();
@@ -27,13 +35,15 @@ const SignupPage = () => {
   const [error, setError] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [countdown, setCountdown] = useState(0);
+  const [selectedProfileFile, setSelectedProfileFile] = useState(null);
+  const [profilePreview, setProfilePreview] = useState('');
+  const [registeredUserId, setRegisteredUserId] = useState(null);
 
   const registrationForm = useForm({
     resolver: yupResolver(signupSchema),
     defaultValues: {
       pgName: '',
       ownerName: '',
-      pgProfilePicture: '',
       emailAddress: '',
       phoneNumber: '',
       password: '',
@@ -60,66 +70,98 @@ const SignupPage = () => {
     }
   }, [countdown]);
 
-  // ✅ UPDATED: Enhanced registration handler with field mapping
+  const handleProfilePictureSelected = (file, previewUrl) => {
+    setSelectedProfileFile(file);
+    setProfilePreview(previewUrl);
+    console.log('📸 Profile picture selected:', file.name);
+  };
+
+  const handleProfilePictureDeleted = () => {
+    setSelectedProfileFile(null);
+    setProfilePreview('');
+  };
+
+  // 🔄 UPDATED handleRegistration function with FormData
   const handleRegistration = async (data) => {
     console.log('🎉 HANDLE REGISTRATION CALLED!');
-  console.log('📝 Form data received:', data);
+    
     try {
       setIsLoading(true);
       setError('');
 
-      console.log('📝 Form data collected:', data);
+      // Create FormData object for file upload support
+      const formData = new FormData();
+      
+      // Add all form fields to FormData (matching your backend @RequestParam names)
+      formData.append('pgName', data.pgName?.trim() || '');
+      formData.append('ownerName', data.ownerName?.trim() || '');
+      formData.append('emailAddress', data.emailAddress?.trim() || '');
+      formData.append('phoneNumber', data.phoneNumber?.trim() || '');
+      formData.append('password', data.password || '');
+      formData.append('confirmPassword', data.confirmPassword || '');
+      formData.append('city', data.city?.trim() || '');
+      formData.append('state', data.state?.trim() || '');
+      formData.append('country', data.country?.trim() || 'India');
+      formData.append('pincode', data.pincode?.trim() || '');
+      
+      // Handle optional numeric fields
+      if (data.latitude && !isNaN(parseFloat(data.latitude))) {
+        formData.append('latitude', parseFloat(data.latitude).toString());
+      }
+      if (data.longitude && !isNaN(parseFloat(data.longitude))) {
+        formData.append('longitude', parseFloat(data.longitude).toString());
+      }
 
-      // Clean and prepare the data for mapping
-      const registrationData = {
-        pgName: data.pgName?.trim(),
-        ownerName: data.ownerName?.trim(),
-        pgProfilePicture: data.pgProfilePicture?.trim() || '',
-        emailAddress: data.emailAddress?.trim(),
-        phoneNumber: data.phoneNumber?.trim(),
-        password: data.password,
-        confirmPassword: data.confirmPassword,
-        city: data.city?.trim(),
-        state: data.state?.trim(),
-        country: data.country?.trim() || 'India',
-        pincode: data.pincode?.trim(),
-        latitude: parseFloat(data.latitude) || 0,
-        longitude: parseFloat(data.longitude) || 0,
-        acceptTerms: data.acceptTerms,
-      };
+      // Add profile picture file if selected
+      if (selectedProfileFile) {
+        formData.append('profilePicture', selectedProfileFile);
+        console.log('📸 Including profile picture:', selectedProfileFile.name, selectedProfileFile.size, 'bytes');
+      }
 
-      console.log('🚀 Cleaned registration data:', registrationData);
-      console.log('📋 Will be mapped to CustomerRegistrationRequest structure');
+      // Debug: Log FormData contents (for debugging)
+      console.log('🚀 FormData contents:');
+      for (let [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          console.log(key + ': File(' + value.name + ', ' + value.size + ' bytes, ' + value.type + ')');
+        } else {
+          console.log(key + ': ' + value);
+        }
+      }
 
-      // This will use the updated authService.register method that maps fields
-      const response = await authService.register(registrationData);
+      console.log('🚀 Registering user with FormData...');
+      const response = await authService.registerWithFile(formData);
       console.log('✅ Registration successful:', response);
 
+      // Extract data from response structure
+      const responseData = response.data || response;
+      
+      setRegisteredUserId(responseData.pgId);
       setUserEmail(data.emailAddress);
       setActiveStep(1);
       setCountdown(60);
-      toast.success('Registration successful! Please check your email for OTP.');
+      
+      if (selectedProfileFile) {
+        toast.success('Registration and profile picture upload successful!');
+      } else {
+        toast.success('Registration successful! Please check your email for OTP.');
+      }
+
+      // Log profile picture URL if available
+      if (responseData.profilePictureUrl) {
+        console.log('📸 Profile picture URL:', responseData.profilePictureUrl);
+      }
       
     } catch (err) {
       console.error('❌ Registration failed:', err);
-      console.error('Error response:', err.response?.data);
-      console.error('Error status:', err.response?.status);
       
-      // Enhanced error handling
       if (err.response?.status === 400) {
         const responseData = err.response.data;
-        
-        if (responseData?.data && typeof responseData.data === 'object') {
-          // Handle field-specific validation errors
-          const errorMessages = Object.values(responseData.data);
-          setError(`Validation errors: ${errorMessages.join(', ')}`);
-        } else if (responseData?.message) {
+        if (responseData?.message) {
           setError(responseData.message);
         } else {
           setError('Please check your form data and try again.');
         }
       } else if (err.response?.status === 409) {
-        // Handle duplicate data errors
         const errorMessage = err.response.data?.message || '';
         if (errorMessage.toLowerCase().includes('email')) {
           setError('Email address already exists');
@@ -128,10 +170,6 @@ const SignupPage = () => {
         } else {
           setError('Email or phone number already exists');
         }
-      } else if (err.response?.status === 500) {
-        setError('Server error. Please try again later.');
-      } else if (err.code === 'NETWORK_ERROR' || !err.response) {
-        setError('Network error. Please check your connection and try again.');
       } else {
         setError(err.response?.data?.message || err.message || 'Registration failed. Please try again.');
       }
@@ -145,7 +183,8 @@ const SignupPage = () => {
       setIsLoading(true);
       setError('');
       
-      await authService.verifyEmailOtp({ emailAddress: userEmail, otp: data.otp });
+      const response = await authService.verifyEmailOtp({ emailAddress: userEmail, otp: data.otp });
+      console.log('✅ OTP verified, user authenticated:', response);
       
       setActiveStep(2);
       toast.success('Email verified successfully!');
@@ -154,7 +193,9 @@ const SignupPage = () => {
         navigate('/login');
         toast.success('Please login with your credentials');
       }, 2000);
+      
     } catch(err) {
+      console.error('❌ OTP verification failed:', err);
       if(err.response?.status === 400) {
         setError('Invalid OTP. Please try again.');
       } else {
@@ -179,6 +220,27 @@ const SignupPage = () => {
   const renderRegistrationStep = () => (
     <Box component="form" onSubmit={registrationForm.handleSubmit(handleRegistration)}>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2, textAlign: 'center' }}>
+          Profile Picture (Optional)
+        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+          <ProfilePictureUpload
+            currentImageUrl={profilePreview}
+            onFileSelected={handleProfilePictureSelected}
+            onImageDeleted={handleProfilePictureDeleted}
+            mode="signup"
+            size={120}
+            disabled={isLoading}
+            showActions={true}
+          />
+        </Box>
+        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 1 }}>
+          Your profile picture will be uploaded during registration
+        </Typography>
+        <Divider sx={{ my: 3 }} />
+      </Box>
 
       <Grid container spacing={2}>
         <Grid item xs={12}>
@@ -226,24 +288,7 @@ const SignupPage = () => {
             )}
           />
         </Grid>
-        
-        <Grid item xs={12}>
-          <Controller
-            name="pgProfilePicture"
-            control={registrationForm.control}
-            render={({ field }) => (
-              <TextField 
-                {...field} 
-                fullWidth 
-                label="PG Profile Picture URL" 
-                error={!!registrationForm.formState.errors.pgProfilePicture} 
-                helperText={registrationForm.formState.errors.pgProfilePicture?.message}
-                placeholder="https://example.com/image.jpg" 
-              />
-            )}
-          />
-        </Grid>
-        
+
         <Grid item xs={12} sm={6}>
           <Controller
             name="emailAddress"
@@ -277,6 +322,7 @@ const SignupPage = () => {
                 {...field} 
                 fullWidth 
                 label="Phone Number *" 
+                placeholder="+91XXXXXXXXXX"
                 error={!!registrationForm.formState.errors.phoneNumber} 
                 helperText={registrationForm.formState.errors.phoneNumber?.message}
                 InputProps={{ 
@@ -383,6 +429,7 @@ const SignupPage = () => {
             render={({ field }) => (
               <TextField 
                 {...field} 
+                select
                 fullWidth 
                 label="State *" 
                 error={!!registrationForm.formState.errors.state} 
@@ -394,7 +441,13 @@ const SignupPage = () => {
                     </InputAdornment>
                   ) 
                 }} 
-              />
+              >
+                {indianStates.map((state) => (
+                  <MenuItem key={state} value={state}>
+                    {state}
+                  </MenuItem>
+                ))}
+              </TextField>
             )}
           />
         </Grid>
@@ -408,6 +461,7 @@ const SignupPage = () => {
                 {...field} 
                 fullWidth 
                 label="Country *" 
+                disabled
                 error={!!registrationForm.formState.errors.country} 
                 helperText={registrationForm.formState.errors.country?.message}
                 InputProps={{ 
@@ -455,6 +509,7 @@ const SignupPage = () => {
                 fullWidth 
                 label="Latitude" 
                 type="number" 
+                placeholder="-90 to 90"
                 error={!!registrationForm.formState.errors.latitude} 
                 helperText={registrationForm.formState.errors.latitude?.message}
                 inputProps={{ step: "any", min: -90, max: 90 }} 
@@ -473,6 +528,7 @@ const SignupPage = () => {
                 fullWidth 
                 label="Longitude" 
                 type="number" 
+                placeholder="-180 to 180"
                 error={!!registrationForm.formState.errors.longitude} 
                 helperText={registrationForm.formState.errors.longitude?.message}
                 inputProps={{ step: "any", min: -180, max: 180 }} 
@@ -584,9 +640,15 @@ const SignupPage = () => {
         🎉 Registration Complete!
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        Your email has been verified successfully. Redirecting to login...
+        {selectedProfileFile 
+          ? "Your email has been verified and profile picture uploaded successfully!"
+          : "Your email has been verified successfully!"
+        }
       </Typography>
-      <CircularProgress />
+      <Typography variant="body2" color="text.secondary">
+        Redirecting to login...
+      </Typography>
+      <CircularProgress sx={{ mt: 2 }} />
     </Box>
   );
 
@@ -657,7 +719,4 @@ const SignupPage = () => {
   );
 };
 
-
 export default SignupPage;
-
-
